@@ -872,4 +872,11 @@ class App {
 }
 
 // Start App
-window.app = new App();
+window.addEventListener('load', () => {
+    console.log("Misión Kora: Iniciando...");
+    if (typeof supabase === 'undefined') {
+        alert("Error: No se ha podido cargar el motor de Supabase. Reintenta o comprueba tu conexión.");
+        return;
+    }
+    window.app = new App();
+});
