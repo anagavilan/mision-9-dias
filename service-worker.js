@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mision-9-dias-v2';
+const CACHE_NAME = 'mision-9-dias-v3'; // Incremented v3
 const ASSETS = [
   './',
   './index.html',
@@ -28,7 +28,20 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
+  // Skip cross-origin requests (like Google Scripts) to avoid CORS/ServiceWorker issues
+  if (!e.request.url.startsWith(self.location.origin)) {
+    return;
+  }
+
   e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request))
+    fetch(e.request)
+      .catch(() => caches.match(e.request))
+      .then((response) => {
+        if (!response) {
+          // Fallback to fetch from network if cache misses, or just let error propagate
+          return fetch(e.request);
+        }
+        return response;
+      })
   );
 });
