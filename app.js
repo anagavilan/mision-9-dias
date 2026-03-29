@@ -56,12 +56,11 @@ class App {
         document.getElementById('loader').classList.add('hidden');
         document.getElementById('user-selection').classList.remove('hidden');
 
-        // Sync in the background or await it if you want, but UI is already ready
-        await this.syncWithCloud();
-        this.renderUserSelection(); // Re-render if cloud data changed
+        // Sync in the background to NOT block the UI, especially on iOS/Safari
+        this.syncWithCloud(true);
     }
 
-    async syncWithCloud() {
+    async syncWithCloud(isInitial = false) {
         if (!this.state.cloudUrl) return;
         const cleanedUrl = this.state.cloudUrl.trim();
         
@@ -81,7 +80,7 @@ class App {
             
             if (!response.ok) {
                 if (response.status === 401 || response.status === 403) {
-                    throw new Error(`Permisos insuficientes. Revisa si el Script está como 'Cualquiera'.`);
+                    throw new Error(`Permisos insuficientes en el Script.`);
                 }
                 throw new Error(`Servidor respondió con código ${response.status}`);
             }
@@ -92,8 +91,7 @@ class App {
             try {
                 cloudData = JSON.parse(rawText);
             } catch (parseErr) {
-                console.error("Parse Error:", rawText);
-                throw new Error("La nube no devolvió un JSON válido. Comprueba el código del Script.");
+                throw new Error("Formato de datos inválido.");
             }
             
             if (cloudData && (cloudData.tasks || cloudData.generationId)) {
@@ -104,13 +102,13 @@ class App {
                     this.state = { ...this.state, ...cloudData };
                     this.saveData(false);
                     if (this.state.currentUser) this.renderDashboard();
-                    this.showFeedback("✓ Datos actualizados desde la nube.");
+                    if (!isInitial) this.showFeedback("✓ Datos actualizados.");
                     return;
                 }
                 
                 if (localGen > cloudGen) {
                     await this.pushToCloud();
-                    this.showFeedback("✓ Tus datos son más actuales. Subidos a la nube.");
+                    if (!isInitial) this.showFeedback("✓ Datos locales subidos.");
                     return;
                 }
 
@@ -140,21 +138,16 @@ class App {
                     this.state.currentDay = Math.max(this.state.currentDay, cloudData.currentDay || 1);
                     this.saveData(false);
                     if (this.state.currentUser) this.renderDashboard();
-                    this.showFeedback("✓ Tareas sincronizadas correctamente.");
+                    if (!isInitial) this.showFeedback("✓ Sincronizado.");
                 } else {
-                    this.showFeedback("ℹ Todo está al día.");
+                    if (!isInitial) this.showFeedback("ℹ Al día.");
                 }
-            } else {
-                this.showFeedback("⚠ La nube está vacía o sin datos.");
             }
         } catch (e) {
             console.error("Cloud sync failed", e);
-            let errorMsg = "❌ Error de conexión.";
-            if (e.message.includes("JSON")) errorMsg = "❌ Error en el formato (JSON). ¿Has pegado el código nuevo en Apps Script?";
-            else if (e.message.indexOf("Cualquiera") !== -1) errorMsg = `❌ Error de Permisos.`;
-            else if (e.message.includes("fetch") || e.name === "TypeError") errorMsg = "❌ Error CORS/Red. Revisa que en 'Nueva Implementación' hayas marcado 'Quién tiene acceso: CUALQUIERA' (no solo con cuenta de Google).";
-            
-            this.showFeedback(`${errorMsg}\n\nDetalle: ${e.message}`);
+            if (!isInitial) {
+                this.showFeedback(`❌ Error de conexión.\nSi estás en un iPhone, asegúrate de abrir la App en SAFARI directamente, no desde WhatsApp.`);
+            }
         } finally {
             if (btn) {
                 btn.innerText = "🔄 Forzar Sincronización";
