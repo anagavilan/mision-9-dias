@@ -276,10 +276,12 @@ class App {
         // Show/Hide sections based on role
         if (user.role === 'admin') {
             document.getElementById('user-stats').classList.add('hidden');
+            document.querySelector('.tasks-section').classList.add('hidden'); // HIDE REDUNDANT "Tareas de Hoy"
             document.getElementById('admin-panel').classList.remove('hidden');
             this.renderAdminPanel();
         } else {
             document.getElementById('user-stats').classList.remove('hidden');
+            document.querySelector('.tasks-section').classList.remove('hidden');
             document.getElementById('admin-panel').classList.add('hidden');
             this.updateStats();
         }
@@ -449,9 +451,13 @@ class App {
 
     renderAdminPanel() {
         const pendingList = document.getElementById('pending-validation-list');
+        if (!pendingList) return;
+        
+        const scrollPos = window.scrollY; // SAVE SCROLL
         const pending = this.state.tasks.filter(t => t.status === 'done');
 
-        let html = `
+        // Only update the controls part IF not already there to avoid flickering
+        let controlsHtml = `
             <div class="admin-controls">
                 <div class="day-selector">
                     <button onclick="window.app.prevDay()">◀</button>
@@ -459,13 +465,13 @@ class App {
                     <button onclick="window.app.nextDay()">▶</button>
                 </div>
                 <div class="quick-actions">
-                    <div id="sync-indicator" style="font-size:0.7rem; text-align:center; color:var(--text-muted); margin-bottom:5px; transition: opacity 0.5s">Sincronizando...</div>
+                    <div id="sync-indicator" style="font-size:0.7rem; text-align:center; color:var(--text-muted); margin-bottom:10px; transition: opacity 0.5s">Sincronizado</div>
                     <button class="btn-save" style="background:#4CAF50" onclick="window.app.syncWithSupabase()">🔄 Sincronizar Ahora</button>
                     <button class="btn-save" style="background:#8E735B" onclick="window.app.addExtraTask()">+ Añadir Extra/Sorpresa</button>
                     <button class="btn-save" style="background:#D32F2F" onclick="window.app.resetTasks()">⚠ Reiniciar Todo</button>
                     
                     <details style="margin-top:15px; color:var(--text-muted); font-size:0.9rem">
-                        <summary style="cursor:pointer">⚙️ Opciones Avanzadas (Copia Seguridad)</summary>
+                        <summary style="cursor:pointer">⚙️ Opciones Avanzadas</summary>
                         <div style="display:flex; gap:10px; margin-top:10px">
                             <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.exportData()">📤 Exportar</button>
                             <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.importData()">📥 Importar</button>
@@ -479,19 +485,20 @@ class App {
                 ${this.renderRanking()}
             </div>
 
-            <h3>Validaciones Pendientes</h3>
+            <h3 style="margin-top:20px">Validaciones Pendientes</h3>
         `;
 
+        let listHtml = '';
         if (pending.length === 0) {
-            html += '<p class="text-muted">No hay tareas pendientes de validar.</p>';
+            listHtml = '<p class="text-muted">No hay tareas pendientes de validar.</p>';
         } else {
-            html += pending.map(t => {
+            listHtml = pending.map(t => {
                 const user = USERS.find(u => u.id === t.assigneeId);
                 return `
                     <div class="task-card">
                         <div class="task-main">
                             <span class="task-name">${t.name}</span>
-                            <span class="task-reward">Por: ${user.name} (${user.icon})</span>
+                            <span class="user-badge">${user.name} (${user.icon})</span>
                         </div>
                         <button class="btn-done active" onclick="window.app.openValidationModal('${t.id}')">Validar</button>
                     </div>
@@ -499,7 +506,28 @@ class App {
             }).join('');
         }
         
-        pendingList.innerHTML = html;
+        // Use a container for the whole panel to avoid full screen blink
+        const adminPanel = document.getElementById('admin-panel');
+        // If it's already full, just update the list to preserve scroll better
+        if (adminPanel.querySelector('.admin-controls')) {
+            // Update Ranking
+            const rankingDiv = adminPanel.querySelector('.admin-ranking');
+            if (rankingDiv) rankingDiv.innerHTML = `<h3>🏆 Posiciones Actuales</h3>` + this.renderRanking();
+            // Update List
+            const listContainer = document.getElementById('pending-validation-list');
+            listContainer.innerHTML = listHtml;
+        } else {
+            // Full render first time
+            adminPanel.innerHTML = `
+                <div class="section-title"><h2>Panel de Control</h2></div>
+                ${controlsHtml}
+                <div id="pending-validation-list" class="tasks-grid">
+                    ${listHtml}
+                </div>
+            `;
+        }
+        
+        window.scrollTo(0, scrollPos); // RESTORE SCROLL
     }
 
     renderRanking() {
