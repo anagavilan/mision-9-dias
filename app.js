@@ -106,15 +106,30 @@ class App {
     async pushToSupabase() {
         try {
             console.log("Pushing state to cloud...", this.state);
+            this.setSyncIndicator('syncing');
             const { error } = await this.sb
                 .from('config')
                 .upsert({ id: 1, data: this.state });
             
-            if (error) console.error("Supabase Upsert Error:", error);
-            else console.log("Cloud Push Success ✅");
+            if (error) {
+                console.error("Supabase Upsert Error:", error);
+                this.setSyncIndicator('error');
+            } else {
+                console.log("Cloud Push Success ✅");
+                this.setSyncIndicator('success');
+            }
         } catch (e) {
             console.error("Push failed:", e);
+            this.setSyncIndicator('error');
         }
+    }
+
+    setSyncIndicator(status) {
+        const dots = document.querySelectorAll('.sync-dot');
+        dots.forEach(dot => {
+            dot.className = 'sync-dot ' + status;
+            dot.title = status === 'success' ? 'Sincronizado' : (status === 'error' ? 'Error de conexión' : 'Sincronizando...');
+        });
     }
 
     mergeData(cloudData, isQuiet = false) {
@@ -152,10 +167,25 @@ class App {
         });
 
         if (hasChanges) {
+            console.log("Applying cloud changes...");
             this.state.tasks = mergedTasks;
             this.state.currentDay = Math.max(this.state.currentDay, cloudData.currentDay || 1);
             this.saveData(false);
-            if (this.state.currentUser) this.renderDashboard();
+            if (this.state.currentUser) {
+                this.renderDashboard();
+                this.showSyncStatus("Actualizado");
+            }
+        } else {
+            this.showSyncStatus("Sincronizado");
+        }
+    }
+
+    showSyncStatus(msg) {
+        const indicator = document.getElementById('sync-indicator');
+        if (indicator) {
+            indicator.innerText = `${msg} ${new Date().toLocaleTimeString()}`;
+            indicator.style.opacity = 1;
+            setTimeout(() => { indicator.style.opacity = 0.5; }, 2000);
         }
     }
 
@@ -429,6 +459,7 @@ class App {
                     <button onclick="window.app.nextDay()">▶</button>
                 </div>
                 <div class="quick-actions">
+                    <div id="sync-indicator" style="font-size:0.7rem; text-align:center; color:var(--text-muted); margin-bottom:5px; transition: opacity 0.5s">Sincronizando...</div>
                     <button class="btn-save" style="background:#4CAF50" onclick="window.app.syncWithSupabase()">🔄 Sincronizar Ahora</button>
                     <button class="btn-save" style="background:#8E735B" onclick="window.app.addExtraTask()">+ Añadir Extra/Sorpresa</button>
                     <button class="btn-save" style="background:#D32F2F" onclick="window.app.resetTasks()">⚠ Reiniciar Todo</button>
