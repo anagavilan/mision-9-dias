@@ -29,7 +29,7 @@ class App {
             currentDay: 1,
             tasks: [],
             earnings: { julia: 0, alex: 0, sam: 0 },
-            cloudUrl: null // URL de Google Sheets
+            cloudUrl: "https://script.google.com/macros/s/AKfycbzKDxrm74YsnLR4stCPhPqD1SLKw-qOnGGvWbw4hfbV7Op2GHx8qJBP2knznbm9T_SyGg/exec" 
         };
         
         this.init();
