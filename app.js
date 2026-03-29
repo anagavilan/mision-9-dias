@@ -43,11 +43,13 @@ class App {
         
         this.init();
     }
-
+    async init() {
+        try {
             // 1. Force Refresh for very old versions (like Julia's v2.0)
-            const lastForced = localStorage.getItem('last_forced_refresh');
-            if (!lastForced || parseInt(lastForced) < 1711725338) { // Today's timestamp
-                localStorage.setItem('last_forced_refresh', Date.now());
+            const lastForced = localStorage.getItem('last_forced_refresh_v6');
+            const forceTime = 1711725338951; // Today
+            if (!lastForced || parseInt(lastForced) < forceTime) {
+                localStorage.setItem('last_forced_refresh_v6', Date.now());
                 window.location.reload(true);
                 return;
             }
@@ -55,7 +57,6 @@ class App {
             this.registerServiceWorker();
             this.loadData(); // Load local first for speed
             
-            // ... (rest of init)
             if (!this.state.tasks) this.state.tasks = [];
             
             this.renderUserSelection();
@@ -64,8 +65,10 @@ class App {
             const loader = document.getElementById('loader');
             if (loader) loader.classList.add('hidden');
             document.body.classList.add('ready');
-            document.getElementById('user-selection').classList.remove('hidden');
+            const userSel = document.getElementById('user-selection');
+            if (userSel) userSel.classList.remove('hidden');
 
+            // Sync with Cloud
             await this.syncWithSupabase(true);
             
             if (this.state.tasks.length === 0) {
@@ -73,7 +76,12 @@ class App {
             }
 
             this.setupRealtimeSync();
-        } catch (e) { ... }
+        } catch (e) {
+            console.error("Init Error:", e);
+            const loader = document.getElementById('loader');
+            if (loader) loader.classList.add('hidden');
+        }
+    }
 
     setupRealtimeSync() {
         const channelId = `mision_${Math.random().toString(36).slice(2, 7)}`;
@@ -597,12 +605,14 @@ class App {
                     
                     <details style="margin-top:15px; color:var(--text-muted); font-size:0.9rem">
                         <summary style="cursor:pointer">⚙️ Opciones Avanzadas</summary>
-                        <div style="margin-top:10px; font-size:0.6rem; opacity:0.5; text-align:center">Versión Supabase Real-time v6.0.0</div>
-                        <div style="display:flex; gap:10px; margin-top:10px">
-                            <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.exportData()">📤 Exportar</button>
-                            <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.importData()">📥 Importar</button>
+                        <div style="display:flex; flex-direction:column; gap:10px; margin-top:10px">
+                            <div style="display:flex; gap:10px">
+                                <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.exportData()">📤 Exportar</button>
+                                <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.importData()">📥 Importar</button>
+                            </div>
+                            <button class="btn-save" style="background:#607D8B; font-size:0.8rem" onclick="window.app.clearLocalAndSync()">🔄 Forzar Recuperación Nube</button>
+                            <button class="btn-save" style="background:#D32F2F; font-size:0.8rem" onclick="window.app.nuclearReset()">☢️ REINICIAR Y ALINEAR IDS (Nuclear)</button>
                         </div>
-                        <button class="btn-save" style="background:#607D8B; width:100%; margin-top:10px; font-size:0.8rem" onclick="window.app.clearLocalAndSync()">🔄 Forzar Recuperación Nube</button>
                     </details>
                 </div>
             </div>
@@ -908,6 +918,34 @@ class App {
             } catch (e) {
                 await this.showAlert("Error", "❌ Datos no válidos.");
             }
+        }
+    }
+
+    async nuclearReset() {
+        if (!confirm("☢️ ¡PELIGRO NUCLEAR! Esto borrará todas las tareas de la nube y alineará los IDs de todos los móviles. Usa esto solo si los niños ven cosas distintas a ti. ¿Continuar?")) return;
+        
+        try {
+            this.setSyncIndicator('syncing');
+            // 1. Wipe cloud tasks
+            await this.sb.from('tasks').delete().neq('id', 'void');
+            
+            // 2. Reset global config
+            this.state.currentDay = 1;
+            this.state.earnings = { julia: 0, alex: 0, sam: 0 };
+            this.state.generationId = Date.now();
+            await this.pushGlobalConfig();
+
+            // 3. Clear local and regenerate with deterministic IDs
+            this.state.tasks = [];
+            this.generateAllDaysTasks(); 
+            
+            await this.pushToSupabase();
+            
+            await this.showAlert("Éxito Nuclear", "✓ IDs alineados. Pide a todos que cierren y abran la App.");
+            location.reload();
+        } catch (e) {
+            console.error("Nuclear reset failed:", e);
+            this.showAlert("Error", "Fallo en el reset nuclear.");
         }
     }
 
