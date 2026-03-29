@@ -17,6 +17,18 @@
     <meta name="description" content="Gestión de tareas familiares con recompensas en tiempo real.">
     <meta name="theme-color" content="#5D4037">
     <meta name="version" content="vnuclear-7">
+    <script>
+    // NUCLEAR SW KILLER - Forzar actualización en móviles atrapados
+    if (localStorage.getItem('sw_killed_v8') !== 'true') {
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) { registration.unregister(); }
+                localStorage.setItem('sw_killed_v8', 'true');
+                window.location.reload(true);
+            });
+        }
+    }
+    </script>
 </head>
 <body>
     <div id="app">
