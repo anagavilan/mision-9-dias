@@ -172,13 +172,18 @@ class App {
         const cleanedUrl = this.state.cloudUrl.trim();
 
         try {
-            await fetch(cleanedUrl, {
+            // Using text/plain for the body and no headers is the most compatible way 
+            // to send a POST to Apps Script from a mobile browser (avoids preflight)
+            const response = await fetch(cleanedUrl, {
                 method: 'POST',
-                mode: 'no-cors', // Apps Script will receive this
+                mode: 'no-cors',
                 cache: 'no-cache',
+                headers: {
+                    'Content-Type': 'text/plain',
+                },
                 body: JSON.stringify(this.state)
             });
-            console.log("Pushed to cloud");
+            console.log("Push completed (opaque)");
         } catch (e) {
             console.error("Cloud push failed", e);
         }
@@ -424,17 +429,16 @@ class App {
         return `<button class="btn-done" onclick="window.app.markAsDone('${task.id}')">Hecho</button>`;
     }
 
-    markAsDone(taskId) {
+    async markAsDone(taskId) {
         const task = this.state.tasks.find(t => t.id === taskId);
         if (task) {
             task.status = 'done';
-            // If it was a free task, the user who clicks it becomes the assignee
             if (!task.assigneeId) {
                 task.assigneeId = this.state.currentUser.id;
             }
-            this.saveData();
+            this.saveData(); // This pushes to cloud
             this.renderDashboard();
-            this.showFeedback('¡Buen trabajo! Pendiente de validación.');
+            await this.showAlert("¡Hecho!", "✓ Tarea marcada. Espera a que Papá la valide.");
         }
     }
 
@@ -526,14 +530,14 @@ class App {
         `;
     }
 
-    saveCloudUrl() {
-        let url = document.getElementById('cloud-url-input').value;
+    async saveCloudUrl() {
+        let url = document.getElementById('cloud-url-input').value.trim();
         if (url && !url.includes('exec')) {
-            alert("Atención: La URL de Apps Script suele terminar en '/exec'. Asegúrate de que sea la URL de implementación.");
+            await this.showAlert("Atención", "La URL de Apps Script suele terminar en '/exec'.");
         }
         this.state.cloudUrl = url;
         this.saveData();
-        alert("Configuración guardada.");
+        await this.showAlert("Guardado", "✓ Configuración de la nube actualizada.");
         this.renderDashboard();
     }
 
@@ -610,10 +614,10 @@ class App {
                 <input type="number" id="input-penalty" value="0" step="0.1" min="0">
 
                 <div class="modal-actions">
-                    <button class="btn-cancel" style="background:#FFE0B2; color:#E65100" onclick="window.app.rejectTask('${task.id}')">Rechazar / No hecha</button>
-                    <button class="btn-confirm" onclick="window.app.validateTask('${task.id}')">Validar y Pagar</button>
+                    <button class="btn-cancel" style="background:#FF9800; color:white" onclick="window.app.rejectTask('${task.id}')">No hecha</button>
+                    <button class="btn-confirm" style="background:var(--primary); color:white" onclick="window.app.validateTask('${task.id}')">Validar ✅</button>
                 </div>
-                <button class="secondary-btn" style="margin-top:12px" onclick="window.app.closeModal()">Cerrar sin cambios</button>
+                <button class="secondary-btn" style="margin-top:12px; border:none; background:none; color:var(--text-muted); cursor:pointer" onclick="window.app.closeLegacyModal()">Cerrar</button>
             </div>
         `;
 
@@ -677,10 +681,8 @@ class App {
         document.getElementById('instructions-modal').classList.remove('hidden');
     }
 
-    closeModal() {
+    closeLegacyModal() {
         document.getElementById('modal-container').classList.add('hidden');
-        document.getElementById('instructions-modal').classList.add('hidden');
-        document.getElementById('task-detail-modal').classList.add('hidden');
     }
 
     setupEventListeners() {
@@ -689,7 +691,7 @@ class App {
     }
 
     showFeedback(msg) {
-        alert(msg);
+        this.showAlert("Mensaje", msg);
     }
 
     exportData() {
