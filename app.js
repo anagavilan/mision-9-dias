@@ -33,6 +33,7 @@ class App {
             currentDay: 1,
             tasks: [],
             earnings: { julia: 0, alex: 0, sam: 0 },
+            generationId: Date.now(),
             cloudUrl: "https://script.google.com/macros/s/AKfycbzKDxrm74YsnLR4stCPhPqD1SLKw-qOnGGvWbw4hfbV7Op2GHx8qJBP2knznbm9T_SyGg/exec" 
         };
         
@@ -68,6 +69,14 @@ class App {
             const cloudData = await response.json();
             
             if (cloudData && cloudData.tasks) {
+                // If cloud has a newer generation, overwrite everything
+                if (cloudData.generationId && cloudData.generationId > this.state.generationId) {
+                    this.state = { ...this.state, ...cloudData };
+                    this.saveData(false);
+                    if (this.state.currentUser) this.renderDashboard();
+                    return;
+                }
+
                 const statusOrder = { 'pending': 0, 'done': 1, 'validated': 2 };
                 
                 // Merge tasks safely
@@ -477,6 +486,7 @@ class App {
 
     resetTasks() {
         if (confirm("¿Seguro que quieres borrar todo y empezar de cero con la nueva lista de tareas?")) {
+            this.state.generationId = Date.now();
             this.state.tasks = [];
             this.generateAllDaysTasks();
             this.state.currentDay = 1;
