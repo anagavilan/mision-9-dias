@@ -44,42 +44,36 @@ class App {
         this.init();
     }
 
-    async init() {
-        try {
+            // 1. Force Refresh for very old versions (like Julia's v2.0)
+            const lastForced = localStorage.getItem('last_forced_refresh');
+            if (!lastForced || parseInt(lastForced) < 1711725338) { // Today's timestamp
+                localStorage.setItem('last_forced_refresh', Date.now());
+                window.location.reload(true);
+                return;
+            }
+
             this.registerServiceWorker();
             this.loadData(); // Load local first for speed
             
-            // Ensure tasks array exists
+            // ... (rest of init)
             if (!this.state.tasks) this.state.tasks = [];
             
-            // Render basic UI immediately
             this.renderUserSelection();
             this.setupEventListeners();
             
-            // HIDE LOADER NOW - Users see local data instantly
             const loader = document.getElementById('loader');
             if (loader) loader.classList.add('hidden');
             document.body.classList.add('ready');
             document.getElementById('user-selection').classList.remove('hidden');
 
-            // Sync with Cloud in background
             await this.syncWithSupabase(true);
             
-            // If still no tasks after sync, generate them
             if (this.state.tasks.length === 0) {
-                console.log("No data. Generating new mission...");
                 this.generateAllDaysTasks();
             }
 
-            // Setup REAL-TIME subscription
             this.setupRealtimeSync();
-        } catch (e) {
-            console.error("Critical Init Error:", e);
-            const loader = document.getElementById('loader');
-            if (loader) loader.classList.add('hidden');
-            document.getElementById('user-selection').classList.remove('hidden');
-        }
-    }
+        } catch (e) { ... }
 
     setupRealtimeSync() {
         const channelId = `mision_${Math.random().toString(36).slice(2, 7)}`;
@@ -241,17 +235,15 @@ class App {
         const incomingTask = {
             id: cloudTask.id, day: cloudTask.day, assigneeId: cloudTask.assignee_id,
             name: cloudTask.name, type: cloudTask.type, status: cloudTask.status,
-            baseReward: cloudTask.base_reward, validation: cloudTask.validation
+            baseReward: parseFloat(cloudTask.base_reward), validation: cloudTask.validation
         };
 
         if (idx === -1) {
             this.state.tasks.push(incomingTask);
         } else {
-            // Merge logic: validated > done > pending
-            const statusOrder = { 'pending': 0, 'done': 1, 'validated': 2 };
-            if (statusOrder[incomingTask.status] >= statusOrder[this.state.tasks[idx].status]) {
-                this.state.tasks[idx] = incomingTask;
-            }
+            // ALWAYS TRUST CLOUD for status in v6.2.0
+            // This ensures if a parent says "redo", the child sees it instantly
+            this.state.tasks[idx] = incomingTask;
         }
         this.saveData(false);
         this.renderDashboard();
@@ -314,20 +306,23 @@ class App {
         const allTasks = [];
         for (let d = 1; d <= 9; d++) {
             INITIAL_TASKS.forEach((t, index) => {
+                // DETERMINISTIC ID: day + index + type
+                // This ensures all devices generate the SAME ID for the same task
+                const deterministicId = `d${d}-i${index}-${t.type}`;
                 allTasks.push({
-                    id: `d${d}-t${index}-${Math.random().toString(36).substr(2, 5)}`,
+                    id: deterministicId,
                     name: t.name,
                     day: d,
                     type: t.type,
                     assigneeId: t.assigneeId || null,
                     baseReward: t.baseReward,
-                    status: 'pending', // pending, done, validated
-                    validation: null // { quality: 1-3, attitude: 1-3, penalty: 0 }
+                    status: 'pending',
+                    validation: null
                 });
             });
         }
         this.state.tasks = allTasks;
-        this.saveData();
+        this.saveData(); // This pushes them with deterministic IDs
     }
 
     renderUserSelection() {
