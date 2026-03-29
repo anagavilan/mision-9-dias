@@ -79,6 +79,7 @@ class App {
     }
 
     async syncWithSupabase(isInitial = false) {
+        if (!isInitial) this.showSyncStatus("Sincronizando manual...");
         try {
             const { data, error } = await this.sb
                 .from('config')
@@ -87,19 +88,22 @@ class App {
                 .single();
 
             if (error) {
-                if (error.code === 'PGRST116') { // Row not found, push initial state
+                if (error.code === 'PGRST116') {
                     await this.pushToSupabase();
                 } else {
-                    console.error("Supabase Select Error:", error);
+                    console.error("Supabase Error:", error);
+                    if (!isInitial) this.showAlert("Error Sync", "No hemos podido conectar con la nube.");
                 }
                 return;
             }
 
             if (data && data.data) {
                 this.mergeData(data.data, isInitial);
+                if (!isInitial) this.showSyncStatus("Sync OK");
             }
         } catch (e) {
             console.error("Sync failed:", e);
+            if (!isInitial) this.showAlert("Error Red", "Revisa tu conexión a internet.");
         }
     }
 
@@ -476,6 +480,7 @@ class App {
                             <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.exportData()">📤 Exportar</button>
                             <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.importData()">📥 Importar</button>
                         </div>
+                        <div style="margin-top:10px; font-size:0.6rem; opacity:0.5; text-align:center">Versión Supabase Real-time v5.0.2</div>
                     </details>
                 </div>
             </div>
@@ -532,6 +537,7 @@ class App {
 
     renderRanking() {
         const rankings = USERS.filter(u => u.role === 'user').map(u => ({
+            id: u.id,
             name: u.name,
             icon: u.icon,
             total: this.calculateEarnings(u.id)
@@ -540,7 +546,7 @@ class App {
         return `
             <div class="ranking-list">
                 ${rankings.map((u, i) => {
-                    const fixed = this.state.tasks.filter(t => t.assigneeId === USERS.find(user => user.name === u.name).id && t.type === 'fixed');
+                    const fixed = this.state.tasks.filter(t => t.assigneeId === u.id && t.type === 'fixed');
                     const valCount = fixed.filter(t => t.status === 'validated').length;
                     const isPerfect = fixed.length > 0 && valCount === fixed.length;
                     
