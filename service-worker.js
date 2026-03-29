@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mision-9-dias-v4'; // v4
+const CACHE_NAME = 'mision-9-dias-v5'; // v5
 const ASSETS = [
   './',
   './index.html',
