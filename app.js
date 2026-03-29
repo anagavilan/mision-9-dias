@@ -57,6 +57,7 @@ class App {
         document.getElementById('user-selection').classList.remove('hidden');
 
         // Sync in the background to NOT block the UI, especially on iOS/Safari
+        // Using JSONP for maximum compatibility
         this.syncWithCloud(true);
     }
 
@@ -70,30 +71,43 @@ class App {
             btn.disabled = true;
         }
 
-        try {
-            const response = await fetch(cleanedUrl, {
-                method: 'GET',
-                mode: 'cors',
-                cache: 'no-cache',
-                redirect: 'follow'
-            });
-            
-            if (!response.ok) {
-                if (response.status === 401 || response.status === 403) {
-                    throw new Error(`Permisos insuficientes en el Script.`);
-                }
-                throw new Error(`Servidor respondió con código ${response.status}`);
-            }
+        // Store resolve/reject for the JSONP promise
+        if (!isInitial) this.showFeedback("⌛ Contactando con la nube...");
 
-            // Using text() and parsing manually is more robust for Apps Script CORS
-            const rawText = await response.text();
-            let cloudData;
-            try {
-                cloudData = JSON.parse(rawText);
-            } catch (parseErr) {
-                throw new Error("Formato de datos inválido.");
-            }
-            
+        // JSONP Implementation to bypass CORS on Mobile Chrome/Safari
+        const scriptId = 'jsonp-sync-' + Date.now();
+        const oldScript = document.getElementById('jsonp-sync-script');
+        if (oldScript) oldScript.remove();
+
+        const script = document.createElement('script');
+        script.id = 'jsonp-sync-script';
+        
+        // Define the global callback
+        window.app_sync_callback = (cloudData) => {
+            clearTimeout(timeout);
+            script.remove();
+            this.handleSyncResponse(cloudData, isInitial, btn);
+        };
+
+        const timeout = setTimeout(() => {
+            script.remove();
+            if (!isInitial) this.showFeedback("❌ Tiempo de espera agotado. Revisa tu conexión.");
+            if (btn) { btn.innerText = "🔄 Forzar Sincronización"; btn.disabled = false; }
+        }, 10000);
+
+        script.src = `${cleanedUrl}${cleanedUrl.includes('?') ? '&' : '?'}callback=window.app_sync_callback&t=${Date.now()}`;
+        script.onerror = () => {
+            clearTimeout(timeout);
+            script.remove();
+            if (!isInitial) this.showFeedback("❌ Error de red al contactar con Google.");
+            if (btn) { btn.innerText = "🔄 Forzar Sincronización"; btn.disabled = false; }
+        };
+
+        document.body.appendChild(script);
+    }
+
+    handleSyncResponse(cloudData, isInitial, btn) {
+        try {
             if (cloudData && (cloudData.tasks || cloudData.generationId)) {
                 const cloudGen = cloudData.generationId || 0;
                 const localGen = this.state.generationId || 0;
@@ -107,8 +121,8 @@ class App {
                 }
                 
                 if (localGen > cloudGen) {
-                    await this.pushToCloud();
-                    if (!isInitial) this.showFeedback("✓ Datos locales subidos.");
+                    this.pushToCloud(); // Fire and forget
+                    if (!isInitial) this.showFeedback("✓ Tus datos son nuevos. Subiendo...");
                     return;
                 }
 
@@ -138,16 +152,13 @@ class App {
                     this.state.currentDay = Math.max(this.state.currentDay, cloudData.currentDay || 1);
                     this.saveData(false);
                     if (this.state.currentUser) this.renderDashboard();
-                    if (!isInitial) this.showFeedback("✓ Sincronizado.");
+                    if (!isInitial) this.showFeedback("✓ Sincronización completada.");
                 } else {
-                    if (!isInitial) this.showFeedback("ℹ Al día.");
+                    if (!isInitial) this.showFeedback("ℹ Todo está al día.");
                 }
             }
         } catch (e) {
-            console.error("Cloud sync failed", e);
-            if (!isInitial) {
-                this.showFeedback(`❌ Error de conexión.\nSi estás en un iPhone, asegúrate de abrir la App en SAFARI directamente, no desde WhatsApp.`);
-            }
+            console.error("Handle sync failed", e);
         } finally {
             if (btn) {
                 btn.innerText = "🔄 Forzar Sincronización";
