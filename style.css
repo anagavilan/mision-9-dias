@@ -21,6 +21,25 @@
     --transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+.sync-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-left: 8px;
+    vertical-align: middle;
+    transition: var(--transition);
+}
+.sync-dot.success { background: var(--success); box-shadow: 0 0 8px var(--success); }
+.sync-dot.syncing { background: var(--pending); animation: pulse 1s infinite; }
+.sync-dot.error { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+
+@keyframes pulse {
+    0% { opacity: 0.4; }
+    50% { opacity: 1; }
+    100% { opacity: 0.4; }
+}
+
 * {
     box-sizing: border-box;
     margin: 0;
