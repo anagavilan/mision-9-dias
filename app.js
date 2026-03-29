@@ -45,26 +45,39 @@ class App {
     }
 
     async init() {
-        this.registerServiceWorker();
-        this.loadData();
-        if (this.state.tasks.length === 0) {
-            this.generateAllDaysTasks();
-        }
-        
-        // Render and setup listeners IMMEDIATELY so UI is interactive
-        this.renderUserSelection();
-        this.setupEventListeners();
-        
-        // Hide loader early
-        document.body.classList.add('ready');
-        document.getElementById('loader').classList.add('hidden');
-        document.getElementById('user-selection').classList.remove('hidden');
+        try {
+            this.registerServiceWorker();
+            this.loadData();
+            
+            // Ensure tasks always exists
+            if (!this.state.tasks) this.state.tasks = [];
+            
+            if (this.state.tasks.length === 0) {
+                this.generateAllDaysTasks();
+            }
+            
+            // Render and setup listeners IMMEDIATELY so UI is interactive
+            this.renderUserSelection();
+            this.setupEventListeners();
+            
+            // Hide loader early
+            const loader = document.getElementById('loader');
+            if (loader) loader.classList.add('hidden');
+            document.body.classList.add('ready');
+            document.getElementById('user-selection').classList.remove('hidden');
 
-        // Sync initially
-        this.syncWithSupabase(true);
-        
-        // Setup REAL-TIME subscription
-        this.setupRealtimeSync();
+            // Sync initially
+            this.syncWithSupabase(true);
+            
+            // Setup REAL-TIME subscription
+            this.setupRealtimeSync();
+        } catch (e) {
+            console.error("Critical Init Error:", e);
+            // Emergency: hide loader so user sees SOME UI
+            const loader = document.getElementById('loader');
+            if (loader) loader.classList.add('hidden');
+            document.getElementById('user-selection').classList.remove('hidden');
+        }
     }
 
     setupRealtimeSync() {
@@ -194,9 +207,17 @@ class App {
     }
 
     loadData() {
-        const saved = localStorage.getItem('mision_9_dias_data');
-        if (saved) {
-            this.state = JSON.parse(saved);
+        try {
+            const saved = localStorage.getItem('mision_9_dias_data');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (parsed && typeof parsed === 'object') {
+                    // Safe merge: keep defaults if property is missing in saved
+                    this.state = { ...this.state, ...parsed };
+                }
+            }
+        } catch (e) {
+            console.error("LoadData failed:", e);
         }
     }
 
