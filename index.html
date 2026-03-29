@@ -169,6 +169,21 @@
         </div>
     </div>
 
-    <script src="app.js" type="module"></script>
+    <!-- Custom Modals System -->
+    <div id="custom-modal" class="modal-overlay hidden">
+        <div class="modal-content">
+            <h3 id="modal-title">Título</h3>
+            <p id="modal-message">Mensaje aquí...</p>
+            <div id="modal-input-container" class="hidden">
+                <input type="text" id="modal-input" placeholder="...">
+            </div>
+            <div class="modal-actions">
+                <button id="modal-cancel-btn" class="btn-cancel hidden">Cancelar</button>
+                <button id="modal-ok-btn" class="btn-ok">Aceptar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
 </body>
 </html>

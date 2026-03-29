@@ -72,7 +72,7 @@ class App {
         }
 
         // Store resolve/reject for the JSONP promise
-        if (!isInitial) this.showFeedback("⌛ Contactando con la nube...");
+        if (!isInitial) this.showAlert("Sincronizando", "⌛ Contactando con la nube...");
 
         // JSONP Implementation to bypass CORS on Mobile Chrome/Safari
         const scriptId = 'jsonp-sync-' + Date.now();
@@ -91,7 +91,7 @@ class App {
 
         const timeout = setTimeout(() => {
             script.remove();
-            if (!isInitial) this.showFeedback("❌ Tiempo de espera agotado. Revisa tu conexión.");
+            if (!isInitial) this.showAlert("Error", "❌ Tiempo de espera agotado. Revisa tu conexión.");
             if (btn) { btn.innerText = "🔄 Forzar Sincronización"; btn.disabled = false; }
         }, 10000);
 
@@ -99,14 +99,14 @@ class App {
         script.onerror = () => {
             clearTimeout(timeout);
             script.remove();
-            if (!isInitial) this.showFeedback("❌ Error de red al contactar con Google.");
+            if (!isInitial) this.showAlert("Error", "❌ Error de red al contactar con Google.");
             if (btn) { btn.innerText = "🔄 Forzar Sincronización"; btn.disabled = false; }
         };
 
         document.body.appendChild(script);
     }
 
-    handleSyncResponse(cloudData, isInitial, btn) {
+    async handleSyncResponse(cloudData, isInitial, btn) {
         try {
             if (cloudData && (cloudData.tasks || cloudData.generationId)) {
                 const cloudGen = cloudData.generationId || 0;
@@ -116,13 +116,13 @@ class App {
                     this.state = { ...this.state, ...cloudData };
                     this.saveData(false);
                     if (this.state.currentUser) this.renderDashboard();
-                    if (!isInitial) this.showFeedback("✓ Datos actualizados.");
+                    if (!isInitial) this.showAlert("Éxito", "✓ Datos actualizados.");
                     return;
                 }
                 
                 if (localGen > cloudGen) {
                     this.pushToCloud(); // Fire and forget
-                    if (!isInitial) this.showFeedback("✓ Tus datos son nuevos. Subiendo...");
+                    if (!isInitial) this.showAlert("Éxito", "✓ Tus datos son nuevos. Subiendo...");
                     return;
                 }
 
@@ -152,9 +152,9 @@ class App {
                     this.state.currentDay = Math.max(this.state.currentDay, cloudData.currentDay || 1);
                     this.saveData(false);
                     if (this.state.currentUser) this.renderDashboard();
-                    if (!isInitial) this.showFeedback("✓ Sincronización completada.");
+                    if (!isInitial) this.showAlert("Éxito", "✓ Sincronización completada.");
                 } else {
-                    if (!isInitial) this.showFeedback("ℹ Todo está al día.");
+                    if (!isInitial) this.showAlert("Info", "ℹ Todo está al día.");
                 }
             }
         } catch (e) {
@@ -230,23 +230,23 @@ class App {
         });
     }
 
-    login(userId) {
+    async login(userId) {
         const user = USERS.find(u => u.id === userId);
         
         // Security check for Parents
         if (user.role === 'admin') {
-            const pin = prompt("Introduce el PIN de acceso para Papás:");
+            const pin = await this.showPrompt("Seguridad", "Introduce el PIN de acceso para Papás:", "PIN de 4 cifras");
             if (pin !== "2026") {
-                alert("PIN Incorrecto");
+                this.showAlert("Error", "PIN Incorrecto");
                 return;
             }
         }
 
         // Security check for specific users (like Julia)
         if (user.pin) {
-            const pin = prompt(`Introduce el PIN de acceso para el perfil de ${user.name}:`);
+            const pin = await this.showPrompt("Acceso", `Introduce el PIN para el perfil de ${user.name}:`, "Tu contraseña");
             if (pin !== user.pin) {
-                alert("PIN Incorrecto");
+                this.showAlert("Error", "PIN Incorrecto");
                 return;
             }
         }
@@ -653,11 +653,13 @@ class App {
         this.showFeedback('Tarea validada con éxito.');
     }
 
-    rejectTask(taskId) {
+    async rejectTask(taskId) {
+        const confirm = await this.showConfirm("Rechazar Tarea", "¿Quieres marcar esta tarea como 'No hecha' y volverla a poner libre?");
+        if (!confirm) return;
+
         const task = this.state.tasks.find(t => t.id === taskId);
         if (task) {
             task.status = 'pending';
-            // If it was a free task, it becomes available again for everyone
             if (task.type === 'free') {
                 task.assigneeId = null;
             }
@@ -665,38 +667,7 @@ class App {
             this.saveData();
             this.closeModal();
             this.renderDashboard();
-            this.showFeedback('Tarea devuelta a estado pendiente.');
-        }
-    }
-
-    requestExtraTask() {
-        const options = [
-            { name: 'Preparar Comida', reward: 1.5 },
-            { name: 'Preparar Cena', reward: 1.5 },
-            { name: 'Cepillar a Kora', reward: 1.0 },
-            { name: 'Limpiar Nevera', reward: 2.0 },
-            { name: 'Ordenar Trastero/Cajones', reward: 2.0 }
-        ];
-
-        const list = options.map((o, i) => `${i + 1}. Ejemplo: ${o.name} (+${o.reward}€)`).join('\n');
-        const choice = prompt(`Elige una tarea extra para hoy:\n\n${list}\n\nEscribe el número:`);
-        
-        const idx = parseInt(choice) - 1;
-        if (options[idx]) {
-            const newTask = {
-                id: `extra-req-${Date.now()}`,
-                name: options[idx].name,
-                day: this.state.currentDay,
-                type: 'extra',
-                assigneeId: this.state.currentUser.id,
-                baseReward: options[idx].reward,
-                status: 'pending',
-                validation: null
-            };
-            this.state.tasks.push(newTask);
-            this.saveData();
-            this.renderDashboard();
-            this.showFeedback(`¡Tarea "${newTask.name}" añadída a tu lista!`);
+            await this.showAlert("Actualizado", "Tarea devuelta al estado pendiente.");
         }
     }
 
@@ -729,11 +700,11 @@ class App {
         el.select();
         document.execCommand('copy');
         document.body.removeChild(el);
-        alert("✓ Datos copiados al portapapeles. Puedes pegarlos en otro móvil.");
+        this.showAlert("Copiado", "✓ Datos copiados al portapapeles.");
     }
 
-    importData() {
-        const json = prompt("Pega aquí los datos exportados:");
+    async importData() {
+        const json = await this.showPrompt("Importar", "Pega aquí los datos exportados:");
         if (json) {
             try {
                 const imported = JSON.parse(json);
@@ -741,14 +712,72 @@ class App {
                     this.state = imported;
                     this.saveData();
                     this.renderDashboard();
-                    alert("✓ Datos importados con éxito.");
+                    await this.showAlert("Éxito", "✓ Datos importados.");
                 } else {
                     throw new Error("Formato inválido.");
                 }
             } catch (e) {
-                alert("❌ Error al importar: Datos no válidos.");
+                await this.showAlert("Error", "❌ Datos no válidos.");
             }
         }
+    }
+
+    showCustomModal(title, msg, type = 'alert', placeholder = '') {
+        return new Promise((resolve) => {
+            const modal = document.getElementById('custom-modal');
+            const titleEl = document.getElementById('modal-title');
+            const msgEl = document.getElementById('modal-message');
+            const inputContainer = document.getElementById('modal-input-container');
+            const inputEl = document.getElementById('modal-input');
+            const cancelBtn = document.getElementById('modal-cancel-btn');
+            const okBtn = document.getElementById('modal-ok-btn');
+
+            titleEl.innerText = title;
+            msgEl.innerText = msg;
+            
+            inputContainer.classList.add('hidden');
+            cancelBtn.classList.add('hidden');
+            inputEl.value = '';
+            
+            if (type === 'prompt') {
+                inputContainer.classList.remove('hidden');
+                inputEl.placeholder = placeholder;
+                cancelBtn.classList.remove('hidden');
+            } else if (type === 'confirm') {
+                cancelBtn.classList.remove('hidden');
+            }
+
+            const cleanUp = (result) => {
+                modal.classList.add('hidden');
+                okBtn.onclick = null;
+                cancelBtn.onclick = null;
+                resolve(result);
+            };
+
+            okBtn.onclick = () => {
+                if (type === 'prompt') cleanUp(inputEl.value);
+                else cleanUp(true);
+            };
+
+            cancelBtn.onclick = () => {
+                cleanUp(false);
+            };
+
+            modal.classList.remove('hidden');
+            if (type === 'prompt') inputEl.focus();
+        });
+    }
+
+    showAlert(title, msg) {
+        return this.showCustomModal(title, msg, 'alert');
+    }
+
+    showConfirm(title, msg) {
+        return this.showCustomModal(title, msg, 'confirm');
+    }
+
+    showPrompt(title, msg, placeholder) {
+        return this.showCustomModal(title, msg, 'prompt', placeholder);
     }
 }
 
