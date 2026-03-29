@@ -63,6 +63,7 @@ class App {
 
     async syncWithCloud() {
         if (!this.state.cloudUrl) return;
+        const cleanedUrl = this.state.cloudUrl.trim();
         
         const btn = document.querySelector('button[onclick="window.app.syncWithCloud()"]');
         if (btn) {
@@ -71,12 +72,17 @@ class App {
         }
 
         try {
-            const response = await fetch(this.state.cloudUrl, {
+            const response = await fetch(cleanedUrl, {
                 method: 'GET',
+                mode: 'cors',
+                cache: 'no-cache',
                 redirect: 'follow'
             });
             
             if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    throw new Error(`Permisos insuficientes. Revisa si el Script está como 'Cualquiera'.`);
+                }
                 throw new Error(`Servidor respondió con código ${response.status}`);
             }
 
@@ -136,11 +142,11 @@ class App {
         } catch (e) {
             console.error("Cloud sync failed", e);
             let errorMsg = "❌ Error de conexión.";
-            if (e.message.includes("JSON")) errorMsg = "❌ Error en el formato de datos de la nube.";
-            else if (e.message.includes("status")) errorMsg = `❌ Error del servidor (${e.message})`;
-            else if (e.message.includes("fetch") || e.name === "TypeError") errorMsg = "❌ Error de red o CORS. Revisa si el Script está como 'Anyone'.";
+            if (e.message.includes("JSON")) errorMsg = "❌ Error en el formato (JSON). ¿Has pegado el código nuevo en Apps Script?";
+            else if (e.message.indexOf("Cualquiera") !== -1) errorMsg = `❌ Error de Permisos.`;
+            else if (e.message.includes("fetch") || e.name === "TypeError") errorMsg = "❌ Error CORS/Red. Revisa que en 'Nueva Implementación' hayas marcado 'Quién tiene acceso: CUALQUIERA' (no solo con cuenta de Google).";
             
-            this.showFeedback(`${errorMsg}\nDetalle: ${e.message}`);
+            this.showFeedback(`${errorMsg}\n\nDetalle: ${e.message}`);
         } finally {
             if (btn) {
                 btn.innerText = "🔄 Forzar Sincronización";
@@ -151,11 +157,13 @@ class App {
 
     async pushToCloud() {
         if (!this.state.cloudUrl) return;
+        const cleanedUrl = this.state.cloudUrl.trim();
 
         try {
-            await fetch(this.state.cloudUrl, {
+            await fetch(cleanedUrl, {
                 method: 'POST',
-                mode: 'no-cors', // Apps Script web app needs no-cors for simple POST
+                mode: 'no-cors', // Apps Script will receive this
+                cache: 'no-cache',
                 body: JSON.stringify(this.state)
             });
             console.log("Pushed to cloud");
