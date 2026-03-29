@@ -27,6 +27,7 @@ const INITIAL_TASKS = [
 ];
 
 class App {
+    constructor() {
         // Supabase Config
         const SUPABASE_URL = "https://nckibxkaqkdrkluvbwvz.supabase.co";
         const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ja2lieGthcWtkcmtsdXZid3Z6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NzI1OTgsImV4cCI6MjA5MDM0ODU5OH0.sCMzFhGwRO3fwNf8m0K4aHjYJpxcN3N4RtfolXn7RV0";
