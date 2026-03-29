@@ -138,7 +138,18 @@ class App {
     }
 
     login(userId) {
-        this.state.currentUser = USERS.find(u => u.id === userId);
+        const user = USERS.find(u => u.id === userId);
+        
+        // Security check for Parents
+        if (user.role === 'admin') {
+            const pin = prompt("Introduce el PIN de acceso para Papás:");
+            if (pin !== "2026") { // Default PIN
+                alert("PIN Incorrecto");
+                return;
+            }
+        }
+
+        this.state.currentUser = user;
         document.getElementById('user-selection').classList.add('hidden');
         document.getElementById('dashboard').classList.remove('hidden');
         this.renderDashboard();
