@@ -2,7 +2,7 @@
 // Core Application Logic
 
 const USERS = [
-    { id: 'julia', name: 'Julia', icon: '🌸', role: 'user' },
+    { id: 'julia', name: 'Julia', icon: '🌸', role: 'user', pin: '1234' }, // PIN Added
     { id: 'alex', name: 'Alex', icon: '🎧', role: 'user' },
     { id: 'sam', name: 'Sam', icon: '🦕', role: 'user' },
     { id: 'admin', name: 'Papás', icon: '👑', role: 'admin' }
@@ -232,7 +232,16 @@ class App {
         // Security check for Parents
         if (user.role === 'admin') {
             const pin = prompt("Introduce el PIN de acceso para Papás:");
-            if (pin !== "2026") { // Default PIN
+            if (pin !== "2026") {
+                alert("PIN Incorrecto");
+                return;
+            }
+        }
+
+        // Security check for specific users (like Julia)
+        if (user.pin) {
+            const pin = prompt(`Introduce el PIN de acceso para el perfil de ${user.name}:`);
+            if (pin !== user.pin) {
                 alert("PIN Incorrecto");
                 return;
             }
