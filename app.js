@@ -501,7 +501,7 @@ class App {
                             <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.exportData()">📤 Exportar</button>
                             <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.importData()">📥 Importar</button>
                         </div>
-                        <div style="margin-top:10px; font-size:0.6rem; opacity:0.5; text-align:center">Versión Supabase Real-time v5.0.2</div>
+                        <div style="margin-top:10px; font-size:0.6rem; opacity:0.5; text-align:center">Versión Supabase Real-time v5.0.3</div>
                     </details>
                 </div>
             </div>
