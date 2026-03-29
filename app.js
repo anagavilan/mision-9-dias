@@ -82,13 +82,26 @@ class App {
     }
 
     setupRealtimeSync() {
-        this.sb.channel('realtime:config')
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'config' }, payload => {
+        // Use a unique channel ID to avoid conflicts
+        const channelId = `mision_${Math.random().toString(36).slice(2, 7)}`;
+        if (this.channel) this.sb.removeChannel(this.channel);
+        
+        this.channel = this.sb.channel(channelId)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'config' }, payload => {
                 if (payload.new && payload.new.data) {
-                    this.mergeData(payload.new.data, true);
+                    console.log("Real-time Update Received 📢");
+                    this.mergeData(payload.new.data, false, true);
+                    this.renderDashboard();
                 }
             })
-            .subscribe();
+            .subscribe(status => {
+                if (status === 'SUBSCRIBED') {
+                    this.setSyncIndicator('success');
+                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+                    console.error("Real-time Subscription Error:", status);
+                    this.setSyncIndicator('error', `Error Real-time: ${status}. Revisa que 'Realtime' esté ON en Supabase.`);
+                }
+            });
     }
 
     async syncWithSupabase(isInitial = false) {
@@ -103,16 +116,17 @@ class App {
             if (error && error.code !== 'PGRST116') throw error;
 
             if (data && data.data) {
-                // Cloud data found: merge with local
                 this.mergeData(data.data, isInitial);
             } else if (isInitial) {
-                // First time ever: push current local state to create the row
+                // Table is empty, create first row
                 await this.pushToSupabase();
             }
             if (!isInitial) this.showSyncStatus("Sincronizado");
+            this.setSyncIndicator('success');
         } catch (e) {
             console.error("Sync Error:", e);
-            if (!isInitial) this.setSyncIndicator('error');
+            this.lastError = e.message || "Error desconocido";
+            this.setSyncIndicator('error', `Fallo al conectar con la nube: ${this.lastError}`);
         }
     }
 
@@ -147,11 +161,15 @@ class App {
         }, 800); 
     }
 
-    setSyncIndicator(status) {
+    setSyncIndicator(status, errorMsg = '') {
+        this.lastSyncError = errorMsg;
         const dots = document.querySelectorAll('.sync-dot');
         dots.forEach(dot => {
             dot.className = 'sync-dot ' + status;
-            dot.title = status === 'success' ? 'Sincronizado' : (status === 'error' ? 'Error de conexión' : 'Sincronizando...');
+            dot.onclick = () => {
+                if (this.lastSyncError) this.showAlert("Estado Sincro", this.lastSyncError);
+            };
+            dot.style.cursor = errorMsg ? 'pointer' : 'default';
         });
     }
 
