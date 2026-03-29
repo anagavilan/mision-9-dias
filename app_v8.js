@@ -182,13 +182,18 @@ class App {
 
     async pushGlobalConfig() {
         try {
-            await this.sb.from('config').upsert({
-                id: 1, 
+            const { error } = await this.sb.from('config').upsert({
+                id: 'global', 
                 current_day: this.state.currentDay, 
                 earnings: this.state.earnings,
                 generation_id: this.state.generationId
             });
-        } catch (e) { console.error("Global push fail:", e); }
+            if (error) throw error;
+            this.logDebug("Config global OK");
+        } catch (e) { 
+            this.logDebug("Error Config: " + e.message);
+            console.error("Global push fail:", e); 
+        }
     }
 
     async pushTaskUpdate(taskId) {
@@ -816,7 +821,7 @@ class App {
         modal.classList.remove('hidden');
     }
 
-    validateTask(taskId) {
+    async validateTask(taskId) {
         const task = this.state.tasks.find(t => t.id === taskId);
         const penalty = parseFloat(document.getElementById('input-penalty').value) || 0;
         
@@ -827,10 +832,15 @@ class App {
             penalty: penalty
         };
 
-        this.saveData();
+        // 1. SAVE LOCAL (Instant)
+        this.saveData(false); 
         this.closeModal();
         this.renderDashboard();
         this.showFeedback('Tarea validada con éxito.');
+
+        // 2. SYNC CLOUD (Background/Granular)
+        await this.pushTaskUpdate(taskId);
+        await this.pushGlobalConfig();
     }
 
     async requestExtraTask() {
