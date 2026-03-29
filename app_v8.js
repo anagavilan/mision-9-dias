@@ -250,18 +250,25 @@ class App {
 
     // NEW: Handle real-time updates for individual tasks
     handleRealtimeTaskUpdate(cloudTask) {
-        const idx = this.state.tasks.findIndex(t => t.id === cloudTask.id);
+        // Map cloud snake_case to local camelCase
         const incomingTask = {
-            id: cloudTask.id, day: cloudTask.day, assigneeId: cloudTask.assignee_id,
-            name: cloudTask.name, type: cloudTask.type, status: cloudTask.status,
-            baseReward: parseFloat(cloudTask.base_reward), validation: cloudTask.validation
+            id: cloudTask.id, 
+            day: cloudTask.day, 
+            assigneeId: cloudTask.assignee_id,
+            name: cloudTask.name, 
+            type: cloudTask.type, 
+            status: cloudTask.status,
+            baseReward: parseFloat(cloudTask.base_reward), 
+            validation: cloudTask.validation
         };
 
+        const idx = this.state.tasks.findIndex(t => t.id === incomingTask.id);
+
         if (idx === -1) {
+            this.logDebug(`Recibida tarea nueva nube: ${incomingTask.id}`);
             this.state.tasks.push(incomingTask);
         } else {
-            // ALWAYS TRUST CLOUD for status in v6.2.0
-            // This ensures if a parent says "redo", the child sees it instantly
+            this.logDebug(`Actualizada tarea nube: ${incomingTask.id} -> ${incomingTask.status}`);
             this.state.tasks[idx] = incomingTask;
         }
         this.saveData(false);
