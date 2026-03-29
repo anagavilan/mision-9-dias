@@ -27,14 +27,17 @@ const INITIAL_TASKS = [
 ];
 
 class App {
-    constructor() {
+        // Supabase Config
+        const SUPABASE_URL = "https://nckibxkaqkdrkluvbwvz.supabase.co";
+        const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ja2lieGthcWtkcmtsdXZid3Z6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ3NzI1OTgsImV4cCI6MjA5MDM0ODU5OH0.sCMzFhGwRO3fwNf8m0K4aHjYJpxcN3N4RtfolXn7RV0";
+        this.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
         this.state = {
             currentUser: null,
             currentDay: 1,
             tasks: [],
             earnings: { julia: 0, alex: 0, sam: 0 },
-            generationId: Date.now(),
-            cloudUrl: "https://script.google.com/macros/s/AKfycbzKDxrm74YsnLR4stCPhPqD1SLKw-qOnGGvWbw4hfbV7Op2GHx8qJBP2knznbm9T_SyGg/exec" 
+            generationId: Date.now()
         };
         
         this.init();
@@ -56,136 +59,101 @@ class App {
         document.getElementById('loader').classList.add('hidden');
         document.getElementById('user-selection').classList.remove('hidden');
 
-        // Sync in the background to NOT block the UI, especially on iOS/Safari
-        // Using JSONP for maximum compatibility
-        this.syncWithCloud(true);
+        // Sync initially
+        this.syncWithSupabase(true);
+        
+        // Setup REAL-TIME subscription
+        this.setupRealtimeSync();
     }
 
-    async syncWithCloud(isInitial = false) {
-        if (!this.state.cloudUrl) return;
-        const cleanedUrl = this.state.cloudUrl.trim();
-        
-        const btn = document.querySelector('button[onclick="window.app.syncWithCloud()"]');
-        if (btn) {
-            btn.innerText = "⌛ Sincronizando...";
-            btn.disabled = true;
-        }
-
-        // Store resolve/reject for the JSONP promise
-        if (!isInitial) this.showAlert("Sincronizando", "⌛ Contactando con la nube...");
-
-        // JSONP Implementation to bypass CORS on Mobile Chrome/Safari
-        const scriptId = 'jsonp-sync-' + Date.now();
-        const oldScript = document.getElementById('jsonp-sync-script');
-        if (oldScript) oldScript.remove();
-
-        const script = document.createElement('script');
-        script.id = 'jsonp-sync-script';
-        
-        // Define the global callback
-        window.app_sync_callback = (cloudData) => {
-            clearTimeout(timeout);
-            script.remove();
-            this.handleSyncResponse(cloudData, isInitial, btn);
-        };
-
-        const timeout = setTimeout(() => {
-            script.remove();
-            if (!isInitial) this.showAlert("Error", "❌ Tiempo de espera agotado. Revisa tu conexión.");
-            if (btn) { btn.innerText = "🔄 Forzar Sincronización"; btn.disabled = false; }
-        }, 10000);
-
-        script.src = `${cleanedUrl}${cleanedUrl.includes('?') ? '&' : '?'}callback=window.app_sync_callback&t=${Date.now()}`;
-        script.onerror = () => {
-            clearTimeout(timeout);
-            script.remove();
-            if (!isInitial) this.showAlert("Error", "❌ Error de red al contactar con Google.");
-            if (btn) { btn.innerText = "🔄 Forzar Sincronización"; btn.disabled = false; }
-        };
-
-        document.body.appendChild(script);
+    setupRealtimeSync() {
+        this.sb.channel('realtime:config')
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'config' }, payload => {
+                if (payload.new && payload.new.data) {
+                    console.log("Real-time Update Received!");
+                    this.mergeData(payload.new.data, true);
+                }
+            })
+            .subscribe();
     }
 
-    async handleSyncResponse(cloudData, isInitial, btn) {
+    async syncWithSupabase(isInitial = false) {
         try {
-            if (cloudData && (cloudData.tasks || cloudData.generationId)) {
-                const cloudGen = cloudData.generationId || 0;
-                const localGen = this.state.generationId || 0;
+            const { data, error } = await this.sb
+                .from('config')
+                .select('data')
+                .eq('id', 1)
+                .single();
 
-                if (cloudGen > localGen) {
-                    this.state = { ...this.state, ...cloudData };
-                    this.saveData(false);
-                    if (this.state.currentUser) this.renderDashboard();
-                    if (!isInitial) this.showAlert("Éxito", "✓ Datos actualizados.");
-                    return;
-                }
-                
-                if (localGen > cloudGen) {
-                    this.pushToCloud(); // Fire and forget
-                    if (!isInitial) this.showAlert("Éxito", "✓ Tus datos son nuevos. Subiendo...");
-                    return;
-                }
-
-                const statusOrder = { 'pending': 0, 'done': 1, 'validated': 2 };
-                let hasChanges = false;
-                const mergedTasks = [...this.state.tasks];
-                
-                cloudData.tasks.forEach(cloudTask => {
-                    const localIdx = mergedTasks.findIndex(t => t.id === cloudTask.id);
-                    if (localIdx === -1) {
-                        mergedTasks.push(cloudTask);
-                        hasChanges = true;
-                    } else {
-                        const localTask = mergedTasks[localIdx];
-                        const localOrder = statusOrder[localTask.status] || 0;
-                        const cloudOrder = statusOrder[cloudTask.status] || 0;
-                        
-                        if (cloudOrder > localOrder) {
-                            mergedTasks[localIdx] = cloudTask;
-                            hasChanges = true;
-                        }
-                    }
-                });
-
-                if (hasChanges) {
-                    this.state.tasks = mergedTasks;
-                    this.state.currentDay = Math.max(this.state.currentDay, cloudData.currentDay || 1);
-                    this.saveData(false);
-                    if (this.state.currentUser) this.renderDashboard();
-                    if (!isInitial) this.showAlert("Éxito", "✓ Sincronización completada.");
+            if (error) {
+                if (error.code === 'PGRST116') { // Row not found, push initial state
+                    await this.pushToSupabase();
                 } else {
-                    if (!isInitial) this.showAlert("Info", "ℹ Todo está al día.");
+                    console.error("Supabase Select Error:", error);
                 }
+                return;
+            }
+
+            if (data && data.data) {
+                this.mergeData(data.data, isInitial);
             }
         } catch (e) {
-            console.error("Handle sync failed", e);
-        } finally {
-            if (btn) {
-                btn.innerText = "🔄 Forzar Sincronización";
-                btn.disabled = false;
-            }
+            console.error("Sync failed:", e);
         }
     }
 
-    async pushToCloud() {
-        if (!this.state.cloudUrl) return;
-        const cleanedUrl = this.state.cloudUrl.trim();
-
+    async pushToSupabase() {
         try {
-            // Using text/plain for the body and no headers is the most compatible way 
-            // to send a POST to Apps Script from a mobile browser (avoids preflight)
-            const response = await fetch(cleanedUrl, {
-                method: 'POST',
-                mode: 'no-cors',
-                cache: 'no-cache',
-                headers: {
-                    'Content-Type': 'text/plain',
-                },
-                body: JSON.stringify(this.state)
-            });
-            console.log("Push completed (opaque)");
+            const { error } = await this.sb
+                .from('config')
+                .upsert({ id: 1, data: this.state });
+            
+            if (error) console.error("Supabase Upsert Error:", error);
+            else console.log("Cloud Push Success");
         } catch (e) {
-            console.error("Cloud push failed", e);
+            console.error("Push failed:", e);
+        }
+    }
+
+    mergeData(cloudData, isQuiet = false) {
+        const cloudGen = cloudData.generationId || 0;
+        const localGen = this.state.generationId || 0;
+
+        // If cloud is from a NEW Mission reset, overwrite local completely
+        if (cloudGen > localGen) {
+            this.state = { ...this.state, ...cloudData };
+            this.saveData(false);
+            if (this.state.currentUser) this.renderDashboard();
+            return;
+        }
+
+        // Merge logic for statuses
+        const statusOrder = { 'pending': 0, 'done': 1, 'validated': 2 };
+        let hasChanges = false;
+        const mergedTasks = [...this.state.tasks];
+        
+        cloudData.tasks.forEach(cloudTask => {
+            const localIdx = mergedTasks.findIndex(t => t.id === cloudTask.id);
+            if (localIdx === -1) {
+                mergedTasks.push(cloudTask);
+                hasChanges = true;
+            } else {
+                const localTask = mergedTasks[localIdx];
+                const localOrder = statusOrder[localTask.status] || 0;
+                const cloudOrder = statusOrder[cloudTask.status] || 0;
+                
+                if (cloudOrder > localOrder) {
+                    mergedTasks[localIdx] = cloudTask;
+                    hasChanges = true;
+                }
+            }
+        });
+
+        if (hasChanges) {
+            this.state.tasks = mergedTasks;
+            this.state.currentDay = Math.max(this.state.currentDay, cloudData.currentDay || 1);
+            this.saveData(false);
+            if (this.state.currentUser) this.renderDashboard();
         }
     }
 
@@ -198,7 +166,7 @@ class App {
 
     saveData(push = true) {
         localStorage.setItem('mision_9_dias_data', JSON.stringify(this.state));
-        if (push) this.pushToCloud();
+        if (push) this.pushToSupabase();
     }
 
     generateAllDaysTasks() {
@@ -453,16 +421,8 @@ class App {
                     <span>Día ${this.state.currentDay}</span>
                     <button onclick="window.app.nextDay()">▶</button>
                 </div>
-                <div class="settings-section">
-                    <h3>Configuración Nube</h3>
-                    <input type="text" id="cloud-url-input" placeholder="URL de Google Apps Script" value="${this.state.cloudUrl || ''}">
-                    <button class="btn-save" onclick="window.app.saveCloudUrl()">Guardar URL</button>
-                    <p class="sync-status ${this.state.cloudUrl ? 'online' : ''}">
-                        ${this.state.cloudUrl ? '✓ Conectado a Sheets' : '⚠ Solo local'}
-                    </p>
-                </div>
                 <div class="quick-actions">
-                    <button class="btn-save" style="background:#5D4037" onclick="window.app.syncWithCloud()">🔄 Forzar Sincronización</button>
+                    <button class="btn-save" style="background:#5D4037" onclick="window.app.syncWithSupabase()">🔄 Forzar Sincronización</button>
                     <button class="btn-save" style="background:#8E735B" onclick="window.app.addExtraTask()">+ Añadir Extra/Sorpresa</button>
                     <button class="btn-save" style="background:#D32F2F" onclick="window.app.resetTasks()">⚠ Reiniciar Todas las Tareas</button>
                     <div style="display:flex; gap:10px; margin-top:10px">
