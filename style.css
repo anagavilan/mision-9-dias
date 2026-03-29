@@ -1,16 +1,17 @@
 :root {
     /* Color Palette - Premium & Warm */
-    --primary: #5D4037; /* Warm Brown (Kora) */
+    --bg: #FFF3E0; /* Warm light orange */
+    --primary: #546E7A;
     --primary-light: #8D6E63;
-    --accent: #FFB300;  /* Gold/Sun */
+    --accent: #FF9800; /* Warmer orange */
     --bg-gradient: linear-gradient(135deg, #FFFDF0 0%, #F5EBE0 100%);
-    --card-bg: rgba(255, 255, 255, 0.85);
+    --card-bg: rgba(255, 255, 255, 0.75);
     --glass-border: rgba(255, 255, 255, 0.5);
-    --text-main: #2D1B10;
-    --text-muted: #8E735B;
-    --success: #689F38;
-    --pending: #FBC02D;
-    --danger: #D32F2F;
+    --text-main: #37474F;
+    --text-muted: #78909C;
+    --success: #4CAF50;
+    --pending: #FFC107;
+    --danger: #FF5252;
     
     /* Shadows & Effects */
     --shadow-soft: 0 12px 40px rgba(0, 0, 0, 0.05);

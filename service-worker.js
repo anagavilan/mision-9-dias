@@ -1,11 +1,11 @@
-const CACHE_NAME = 'mision-9-dias-v3'; // Incremented v3
+const CACHE_NAME = 'mision-9-dias-v4'; // v4
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
   './manifest.json',
-  './mision_9_dias_header_1774779453951.png'
+  './mision_header_v2.jpg'
 ];
 
 self.addEventListener('install', (e) => {
