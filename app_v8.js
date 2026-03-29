@@ -45,41 +45,45 @@ class App {
     }
     async init() {
         try {
-            // 1. Force Refresh for very old versions (like Julia's v2.0)
-            const lastForced = localStorage.getItem('last_forced_refresh_v6');
-            const forceTime = 1711725338951; // Today
-            if (!lastForced || parseInt(lastForced) < forceTime) {
-                localStorage.setItem('last_forced_refresh_v6', Date.now());
-                window.location.reload(true);
+            // 1. Force Clean Refresh 
+            if (localStorage.getItem('mision_kora_refresh_v8_3') !== 'true') {
+                localStorage.clear();
+                localStorage.setItem('mision_kora_refresh_v8_3', 'true');
+                location.reload(true);
                 return;
             }
 
             this.registerServiceWorker();
-            this.loadData(); // Load local first for speed
+            this.loadData();
             
-            if (!this.state.tasks) this.state.tasks = [];
+            // 2. ID ALIGNMENT (FORCE)
+            const needsMigration = this.state.tasks.length > 0 && 
+                                 (!this.state.tasks[0].id.startsWith('d1-i0-'));
             
-            this.renderUserSelection();
-            this.setupEventListeners();
-            
-            const loader = document.getElementById('loader');
-            if (loader) loader.classList.add('hidden');
-            document.body.classList.add('ready');
-            const userSel = document.getElementById('user-selection');
-            if (userSel) userSel.classList.remove('hidden');
+            if (needsMigration) {
+                console.log("Alineando IDs de tareas...");
+                this.state.tasks = [];
+                this.generateAllDaysTasks();
+                this.saveData(true);
+            }
 
-            // Sync with Cloud
-            await this.syncWithSupabase(true);
-            
             if (this.state.tasks.length === 0) {
                 this.generateAllDaysTasks();
             }
 
+            this.renderUserSelection();
+            this.setupEventListeners();
+            
+            document.getElementById('loader')?.classList.add('hidden');
+            document.body.classList.add('ready');
+            document.getElementById('user-selection')?.classList.remove('hidden');
+
+            // 3. Setup Connection
             this.setupRealtimeSync();
+            await this.syncWithSupabase(true);
         } catch (e) {
             console.error("Init Error:", e);
-            const loader = document.getElementById('loader');
-            if (loader) loader.classList.add('hidden');
+            document.getElementById('loader')?.classList.add('hidden');
         }
     }
 
@@ -203,7 +207,7 @@ class App {
                 status: task.status, 
                 base_reward: task.baseReward,
                 validation: task.validation,
-                last_update: new Date()
+                last_update: new Date().toISOString()
             });
 
             if (error) throw error;
