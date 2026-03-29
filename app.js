@@ -526,6 +526,7 @@ class App {
                             <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.exportData()">📤 Exportar</button>
                             <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.importData()">📥 Importar</button>
                         </div>
+                        <button class="btn-save" style="background:#607D8B; width:100%; margin-top:10px; font-size:0.8rem" onclick="window.app.clearLocalAndSync()">🔄 Forzar Recuperación Nube</button>
                     </details>
                 </div>
             </div>
@@ -794,6 +795,17 @@ class App {
 
     showFeedback(msg) {
         this.showAlert("Mensaje", msg);
+    }
+
+    async clearLocalAndSync() {
+        const confirm = await this.showConfirm("🔄 Forzar Recuperación", "¿Quieres borrar los datos locales y descargar todo de nuevo desde la nube? (Útil si un móvil no se sincroniza bien)");
+        if (!confirm) return;
+        
+        localStorage.removeItem('mision_9_dias_data');
+        this.showSyncStatus("Limpiando...");
+        await this.syncWithSupabase(true);
+        this.renderDashboard();
+        await this.showAlert("Recuperado", "✓ Datos locales limpiados y sincronizados con la nube.");
     }
 
     exportData() {
