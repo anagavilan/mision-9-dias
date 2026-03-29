@@ -475,9 +475,9 @@ class App {
     }
 
     renderAdminPanel() {
-        const pendingList = document.getElementById('pending-validation-list');
-        if (!pendingList) return;
-        
+        const adminPanel = document.getElementById('admin-panel');
+        if (!adminPanel) return;
+
         const scrollPos = window.scrollY; // SAVE SCROLL
         const pending = this.state.tasks.filter(t => t.status === 'done');
 
@@ -524,7 +524,7 @@ class App {
                     <div class="task-card">
                         <div class="task-main">
                             <span class="task-name">${t.name}</span>
-                            <span class="user-badge">${user.name} (${user.icon})</span>
+                            <span class="user-badge">${user ? user.name : '?' } (${user ? user.icon : '❓'})</span>
                         </div>
                         <button class="btn-done active" onclick="window.app.openValidationModal('${t.id}')">Validar</button>
                     </div>
@@ -532,8 +532,6 @@ class App {
             }).join('');
         }
         
-        // Use a container for the whole panel to avoid full screen blink
-        const adminPanel = document.getElementById('admin-panel');
         // If it's already full, just update the list to preserve scroll better
         if (adminPanel.querySelector('.admin-controls')) {
             // Update Ranking
@@ -541,7 +539,7 @@ class App {
             if (rankingDiv) rankingDiv.innerHTML = `<h3>🏆 Posiciones Actuales</h3>` + this.renderRanking();
             // Update List
             const listContainer = document.getElementById('pending-validation-list');
-            listContainer.innerHTML = listHtml;
+            if (listContainer) listContainer.innerHTML = listHtml;
         } else {
             // Full render first time
             adminPanel.innerHTML = `
