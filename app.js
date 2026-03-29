@@ -265,6 +265,11 @@ class App {
     renderExtraTaskButton() {
         const tasksSection = document.querySelector('.tasks-section');
         let btn = document.getElementById('request-extra-btn');
+        if (this.state.currentUser.role === 'admin') {
+            if (btn) btn.remove();
+            return;
+        }
+        
         if (!btn) {
             btn = document.createElement('button');
             btn.id = 'request-extra-btn';
@@ -424,13 +429,17 @@ class App {
                     <button onclick="window.app.nextDay()">▶</button>
                 </div>
                 <div class="quick-actions">
-                    <button class="btn-save" style="background:#5D4037" onclick="window.app.syncWithSupabase()">🔄 Forzar Sincronización</button>
+                    <button class="btn-save" style="background:#4CAF50" onclick="window.app.syncWithSupabase()">🔄 Sincronizar Ahora</button>
                     <button class="btn-save" style="background:#8E735B" onclick="window.app.addExtraTask()">+ Añadir Extra/Sorpresa</button>
-                    <button class="btn-save" style="background:#D32F2F" onclick="window.app.resetTasks()">⚠ Reiniciar Todas las Tareas</button>
-                    <div style="display:flex; gap:10px; margin-top:10px">
-                        <button class="btn-save" style="background:#455A64; flex:1" onclick="window.app.exportData()">📤 Exportar (Copia)</button>
-                        <button class="btn-save" style="background:#455A64; flex:1" onclick="window.app.importData()">📥 Importar</button>
-                    </div>
+                    <button class="btn-save" style="background:#D32F2F" onclick="window.app.resetTasks()">⚠ Reiniciar Todo</button>
+                    
+                    <details style="margin-top:15px; color:var(--text-muted); font-size:0.9rem">
+                        <summary style="cursor:pointer">⚙️ Opciones Avanzadas (Copia Seguridad)</summary>
+                        <div style="display:flex; gap:10px; margin-top:10px">
+                            <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.exportData()">📤 Exportar</button>
+                            <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.importData()">📥 Importar</button>
+                        </div>
+                    </details>
                 </div>
             </div>
             
