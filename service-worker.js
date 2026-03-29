@@ -1,9 +1,9 @@
-const CACHE_NAME = 'mision-kora-v9'; // v6
+const CACHE_NAME = 'mision-kora-v10';
 const ASSETS = [
   './',
   './index.html',
-  './style.css',
-  './app.js',
+  './style_v8.css',
+  './app_v8.js',
   './manifest.json',
   './mision_header_v2.jpg'
 ];
