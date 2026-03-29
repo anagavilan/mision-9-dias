@@ -21,9 +21,9 @@ const INITIAL_TASKS = [
     { name: 'Limpiar Patio', type: 'free', baseReward: 0.5 },
     
     // Free tasks (Multiple slots for Sacar Kora)
-    { name: 'Sacar Kora (Mañana)', type: 'free', baseReward: 0.5 },
-    { name: 'Sacar Kora (Tarde)', type: 'free', baseReward: 0.5 },
-    { name: 'Sacar Kora (Noche)', type: 'free', baseReward: 0.5 }
+    { name: 'Sacar Kora (Mañana)', type: 'free', baseReward: 3.0 },
+    { name: 'Sacar Kora (Tarde)', type: 'free', baseReward: 3.0 },
+    { name: 'Sacar Kora (Noche)', type: 'free', baseReward: 3.0 }
 ];
 
 class App {
@@ -548,12 +548,12 @@ class App {
         const options = [
             { name: 'Preparar Comida', reward: 1.5 },
             { name: 'Preparar Cena', reward: 1.5 },
-            { name: 'Lavar a Kora', reward: 2.0 },
-            { name: 'Limpiar Cristales', reward: 1.5 },
+            { name: 'Cepillar a Kora', reward: 1.0 },
+            { name: 'Limpiar Nevera', reward: 2.0 },
             { name: 'Ordenar Trastero/Cajones', reward: 2.0 }
         ];
 
-        const list = options.map((o, i) => `${i + 1}. ${o.name} (+${o.reward}€)`).join('\n');
+        const list = options.map((o, i) => `${i + 1}. Ejemplo: ${o.name} (+${o.reward}€)`).join('\n');
         const choice = prompt(`Elige una tarea extra para hoy:\n\n${list}\n\nEscribe el número:`);
         
         const idx = parseInt(choice) - 1;
