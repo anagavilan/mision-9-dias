@@ -30,6 +30,7 @@
             <div class="user-grid" id="user-grid">
                 <!-- User buttons will be injected here -->
             </div>
+            <button id="show-instructions-btn" class="secondary-btn">📖 Cómo Funciona</button>
         </div>
 
         <!-- Main Dashboard -->
@@ -81,6 +82,86 @@
     <div id="modal-container" class="modal-backdrop hidden">
         <div id="task-detail-modal" class="modal-content">
             <!-- Modal detail content -->
+        </div>
+        <div id="instructions-modal" class="modal-content hidden" style="max-height: 80vh; overflow-y: auto;">
+            <div class="instructions-body">
+                <h2>💰 MISIÓN 9 DÍAS – CÓMO FUNCIONA</h2>
+                <p>Durante estos días podéis ganar dinero ayudando en casa.</p>
+                <p>👉 Es simple: lo que haces, se paga</p>
+                
+                <h3>🧩 ¿QUÉ TENÉIS QUE HACER?</h3>
+                <p>Cada día hay tareas.</p>
+                
+                <h4>🔒 Tareas fijas</h4>
+                <ul>
+                    <li>Julia → Mesa mediodía</li>
+                    <li>Alex → Mesa noche</li>
+                    <li>Sam → Basura</li>
+                </ul>
+
+                <h4>🔄 Tareas libres</h4>
+                <p>Las hacéis entre vosotros:</p>
+                <ul>
+                    <li>Sacar a Kora</li>
+                    <li>Darle desayuno y cena</li>
+                    <li>Sacar lavavajillas</li>
+                    <li>Limpiar patio</li>
+                </ul>
+                <p>👉 Os organizáis como queráis</p>
+
+                <h3>⭐ TAREAS EXTRA</h3>
+                <p>Si queréis ganar más dinero, podéis pedir tareas extra.</p>
+                <p>👉 Se pagan mejor que las normales</p>
+
+                <h3>🎁 TAREAS SORPRESA</h3>
+                <p>A veces aparecerán tareas sorpresa.</p>
+                <ul>
+                    <li>No son obligatorias</li>
+                    <li>Pero dan más dinero</li>
+                </ul>
+
+                <h3>🐶 KORA</h3>
+                <ul>
+                    <li>Tiene que salir mínimo 1 vez al día</li>
+                    <li>Lo ideal es que todos participéis</li>
+                </ul>
+
+                <h3>💰 ¿CÓMO GANÁIS DINERO?</h3>
+                <h4>Tareas normales</h4>
+                <ul>
+                    <li>0,50€ por hacerla</li>
+                    <li>+0,25€ si está bien hecha</li>
+                    <li>+0,25€ si la actitud es buena</li>
+                </ul>
+
+                <h4>Extras y sorpresa</h4>
+                <ul>
+                    <li>Se pagan más (según tarea)</li>
+                </ul>
+
+                <h3>🏆 BONUS FINAL</h3>
+                <ul>
+                    <li>🥇 1º → +5€</li>
+                    <li>🥈 2º → +3€</li>
+                    <li>🥉 3º → +1€</li>
+                </ul>
+
+                <h3>🔴 PENALIZACIONES</h3>
+                <ul>
+                    <li>No hacer tarea asignada → 0€</li>
+                    <li>Hacerla mal → no se paga</li>
+                    <li>Actitud mala → hasta -0,50€</li>
+                </ul>
+
+                <h3>⚠️ MUY IMPORTANTE</h3>
+                <ul>
+                    <li>Marcar “hecho” NO significa cobrar</li>
+                    <li>Primero se revisa</li>
+                </ul>
+                <p>👉 Solo se paga lo que esté bien hecho</p>
+
+                <button class="btn-save" onclick="window.app.closeModal()">Entendido</button>
+            </div>
         </div>
     </div>
 

@@ -5,7 +5,7 @@ const USERS = [
     { id: 'julia', name: 'Julia', icon: '🌸', role: 'user' },
     { id: 'alex', name: 'Alex', icon: '🎧', role: 'user' },
     { id: 'sam', name: 'Sam', icon: '🦕', role: 'user' },
-    { id: 'admin', name: 'Padres', icon: '👑', role: 'admin' }
+    { id: 'admin', name: 'Papás', icon: '👑', role: 'admin' }
 ];
 
 const INITIAL_TASKS = [
@@ -17,13 +17,13 @@ const INITIAL_TASKS = [
     // Free tasks (Unique)
     { name: 'Alimentar Kora (Mañana)', type: 'free', baseReward: 0.5 },
     { name: 'Alimentar Kora (Noche)', type: 'free', baseReward: 0.5 },
-    { name: 'Vaciar Lavavajillas', type: 'free', baseReward: 0.8 },
-    { name: 'Limpiar Patio', type: 'free', baseReward: 1.2 },
+    { name: 'Vaciar Lavavajillas', type: 'free', baseReward: 0.5 },
+    { name: 'Limpiar Patio', type: 'free', baseReward: 0.5 },
     
     // Free tasks (Multiple slots for Sacar Kora)
-    { name: 'Sacar Kora (Mañana)', type: 'free', baseReward: 1.0 },
-    { name: 'Sacar Kora (Tarde)', type: 'free', baseReward: 1.0 },
-    { name: 'Sacar Kora (Noche)', type: 'free', baseReward: 1.0 }
+    { name: 'Sacar Kora (Mañana)', type: 'free', baseReward: 0.5 },
+    { name: 'Sacar Kora (Tarde)', type: 'free', baseReward: 0.5 },
+    { name: 'Sacar Kora (Noche)', type: 'free', baseReward: 0.5 }
 ];
 
 class App {
@@ -201,13 +201,16 @@ class App {
         return this.state.tasks
             .filter(t => t.assigneeId === userId && t.status === 'validated')
             .reduce((acc, t) => {
-                let reward = t.baseReward;
+                let reward = t.baseReward; // Base 0.50 for normal tasks
                 if (t.validation) {
-                    // Complexity factor: quality (1-3)
-                    const qMult = t.validation.quality === 3 ? 1.2 : (t.validation.quality === 1 ? 0.8 : 1.0);
-                    // Attitude factor (1-3)
-                    const aMult = t.validation.attitude === 3 ? 1.1 : (t.validation.attitude === 1 ? 0.7 : 1.0);
-                    reward = (t.baseReward * qMult * aMult) - (t.validation.penalty || 0);
+                    // Quality factor: +0.25 if stars >= 3 (well done)
+                    const qBonus = t.validation.quality === 3 ? 0.25 : 0.0;
+                    // Attitude factor: +0.25 if emoji is happy, or penalty if angry
+                    let aBonus = 0;
+                    if (t.validation.attitude === 3) aBonus = 0.25;
+                    else if (t.validation.attitude === 1) aBonus = -0.50; // Max penalty mentioned in instructions
+                    
+                    reward = t.baseReward + qBonus + aBonus - (t.validation.penalty || 0);
                 }
                 return acc + Math.max(0, reward);
             }, 0);
@@ -292,6 +295,12 @@ class App {
                     <button class="btn-save" style="background:#D32F2F" onclick="window.app.resetTasks()">⚠ Reiniciar Todas las Tareas</button>
                 </div>
             </div>
+            
+            <div class="admin-ranking">
+                <h3>🏆 Posiciones Actuales</h3>
+                ${this.renderRanking()}
+            </div>
+
             <h3>Validaciones Pendientes</h3>
         `;
 
@@ -313,6 +322,27 @@ class App {
         }
         
         pendingList.innerHTML = html;
+    }
+
+    renderRanking() {
+        const rankings = USERS.filter(u => u.role === 'user').map(u => ({
+            name: u.name,
+            icon: u.icon,
+            total: this.calculateEarnings(u.id)
+        })).sort((a, b) => b.total - a.total);
+
+        return `
+            <div class="ranking-list">
+                ${rankings.map((u, i) => `
+                    <div class="ranking-item">
+                        <span class="rank-pos">${i === 0 ? '🥇' : (i === 1 ? '🥈' : '🥉')}</span>
+                        <span class="rank-name">${u.name}</span>
+                        <span class="rank-total">${u.total.toFixed(2)}€</span>
+                        <span class="rank-bonus">+${i === 0 ? '5' : (i === 1 ? '3' : '1')}€ Bonus</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
     }
 
     saveCloudUrl() {
@@ -437,12 +467,21 @@ class App {
         this.showFeedback('Tarea validada con éxito.');
     }
 
+    openInstructions() {
+        document.getElementById('modal-container').classList.remove('hidden');
+        document.getElementById('task-detail-modal').classList.add('hidden');
+        document.getElementById('instructions-modal').classList.remove('hidden');
+    }
+
     closeModal() {
         document.getElementById('modal-container').classList.add('hidden');
+        document.getElementById('instructions-modal').classList.add('hidden');
+        document.getElementById('task-detail-modal').classList.add('hidden');
     }
 
     setupEventListeners() {
         document.getElementById('logout-btn').onclick = () => this.logout();
+        document.getElementById('show-instructions-btn').onclick = () => this.openInstructions();
     }
 
     showFeedback(msg) {

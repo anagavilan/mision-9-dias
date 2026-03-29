@@ -363,6 +363,59 @@ header p {
     cursor: pointer;
 }
 
+.secondary-btn {
+    background: transparent;
+    border: 2px solid var(--primary-light);
+    color: var(--primary);
+    padding: 12px;
+    border-radius: 16px;
+    margin-top: 24px;
+    font-weight: 600;
+    cursor: pointer;
+    width: 100%;
+}
+
+.instructions-body {
+    padding-bottom: 20px;
+}
+
+/* Admin Ranking */
+.admin-ranking {
+    margin-top: 32px;
+    margin-bottom: 32px;
+    background: white;
+    padding: 24px;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-soft);
+}
+
+.ranking-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.ranking-item {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px;
+    border-radius: 12px;
+    background: #f9f9f9;
+}
+
+.rank-pos { font-size: 1.5rem; }
+.rank-name { font-weight: 600; flex-grow: 1; }
+.rank-total { font-weight: 700; color: var(--primary); }
+.rank-bonus { font-size: 0.8rem; background: var(--accent); color: white; padding: 2px 8px; border-radius: 8px; }
+
+.instructions-body ul { padding-left: 20px; margin: 12px 0; }
+
+.instructions-body li { margin-bottom: 6px; }
+.instructions-body p { margin-bottom: 12px; }
+
+
 /* Admin Only */
 .admin-only {
     margin-top: 40px;
