@@ -206,8 +206,7 @@ class App {
                 type: task.type, 
                 status: task.status, 
                 base_reward: task.baseReward,
-                validation: task.validation,
-                last_update: new Date().toISOString()
+                validation: task.validation
             });
 
             if (error) throw error;
