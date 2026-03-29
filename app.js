@@ -68,24 +68,36 @@ class App {
             const response = await fetch(this.state.cloudUrl);
             const cloudData = await response.json();
             
-            if (cloudData && cloudData.tasks) {
-                // If cloud has a newer generation, overwrite everything
-                if (cloudData.generationId && cloudData.generationId > this.state.generationId) {
+            if (cloudData && (cloudData.tasks || cloudData.generationId)) {
+                // STRICT GENERATION SYNC
+                // If cloud has a different generation, the newer one ALWAYS wins completely
+                const cloudGen = cloudData.generationId || 0;
+                const localGen = this.state.generationId || 0;
+
+                if (cloudGen > localGen) {
+                    console.log("Cloud has newer generation. Overwriting local state.");
                     this.state = { ...this.state, ...cloudData };
                     this.saveData(false);
                     if (this.state.currentUser) this.renderDashboard();
                     return;
                 }
-
-                const statusOrder = { 'pending': 0, 'done': 1, 'validated': 2 };
                 
-                // Merge tasks safely
+                if (localGen > cloudGen) {
+                    console.log("Local state is newer. Pushing to cloud.");
+                    this.pushToCloud();
+                    return;
+                }
+
+                // If same generation, perform smart task merge
+                const statusOrder = { 'pending': 0, 'done': 1, 'validated': 2 };
+                let hasChanges = false;
                 const mergedTasks = [...this.state.tasks];
                 
                 cloudData.tasks.forEach(cloudTask => {
                     const localIdx = mergedTasks.findIndex(t => t.id === cloudTask.id);
                     if (localIdx === -1) {
                         mergedTasks.push(cloudTask);
+                        hasChanges = true;
                     } else {
                         const localTask = mergedTasks[localIdx];
                         const localOrder = statusOrder[localTask.status] || 0;
@@ -93,15 +105,17 @@ class App {
                         
                         if (cloudOrder > localOrder) {
                             mergedTasks[localIdx] = cloudTask;
+                            hasChanges = true;
                         }
                     }
                 });
 
-                this.state.tasks = mergedTasks;
-                this.state.currentDay = Math.max(this.state.currentDay, cloudData.currentDay || 1);
-                
-                this.saveData(false);
-                if (this.state.currentUser) this.renderDashboard();
+                if (hasChanges) {
+                    this.state.tasks = mergedTasks;
+                    this.state.currentDay = Math.max(this.state.currentDay, cloudData.currentDay || 1);
+                    this.saveData(false);
+                    if (this.state.currentUser) this.renderDashboard();
+                }
             }
         } catch (e) {
             console.error("Cloud sync failed", e);
@@ -388,6 +402,7 @@ class App {
                     </p>
                 </div>
                 <div class="quick-actions">
+                    <button class="btn-save" style="background:#5D4037" onclick="window.app.syncWithCloud()">🔄 Forzar Sincronización</button>
                     <button class="btn-save" style="background:#8E735B" onclick="window.app.addExtraTask()">+ Añadir Extra/Sorpresa</button>
                     <button class="btn-save" style="background:#D32F2F" onclick="window.app.resetTasks()">⚠ Reiniciar Todas las Tareas</button>
                 </div>
