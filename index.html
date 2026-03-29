@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Misión 9 Días</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#5D4037">
+</head>
+<body>
+    <div id="app">
+        <!-- Dashboard Loader -->
+        <div id="loader" class="screen">
+            <div class="spinner"></div>
+        </div>
+        
+        <!-- User Selection Screen -->
+        <div id="user-selection" class="screen hidden">
+            <img src="mision_9_dias_header_1774779453951.png" class="header-img" alt="Home and Kora">
+            <header>
+                <h1>Misión 9 Días</h1>
+                <p>Responsabilidad y Convivencia</p>
+            </header>
+            <div class="user-grid" id="user-grid">
+                <!-- User buttons will be injected here -->
+            </div>
+        </div>
+
+        <!-- Main Dashboard -->
+        <main id="dashboard" class="screen hidden">
+            <header class="main-header">
+                <div class="user-info">
+                    <span id="current-user-name">Usuario</span>
+                    <span id="day-counter">Día 1/9</span>
+                </div>
+                <button id="logout-btn" class="icon-btn">🔓</button>
+            </header>
+
+            <!-- Stats/Earnings (Specific to Child) -->
+            <section id="user-stats" class="stats-container">
+                <div class="stat-card">
+                    <span class="stat-label">Acumulado</span>
+                    <span id="user-total-earnings" class="stat-value">0.00€</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-label">Tareas Semanales</span>
+                    <span id="user-tasks-count" class="stat-value">0/0</span>
+                </div>
+            </section>
+
+            <!-- Task List -->
+            <section class="tasks-section">
+                <div class="section-title">
+                    <h2>Tareas de Hoy</h2>
+                    <span id="current-date">Domingo, 29 Mar</span>
+                </div>
+                <div id="tasks-list" class="tasks-grid">
+                    <!-- Tasks will be injected here -->
+                </div>
+            </section>
+
+            <!-- Admin specific views -->
+            <section id="admin-panel" class="admin-only hidden">
+                <div class="section-title">
+                    <h2>Validación Pendiente</h2>
+                </div>
+                <div id="pending-validation-list" class="tasks-grid">
+                    <!-- Pending tasks for admin -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-container" class="modal-backdrop hidden">
+        <div id="task-detail-modal" class="modal-content">
+            <!-- Modal detail content -->
+        </div>
+    </div>
+
+    <script src="app.js" type="module"></script>
+</body>
+</html>
