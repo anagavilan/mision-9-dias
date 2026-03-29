@@ -56,31 +56,25 @@ class App {
             this.renderUserSelection();
             this.setupEventListeners();
             
-            // Sync with Cloud (Priority)
-            await this.syncWithSupabase(true);
-            
-            // If still no tasks after sync, generate them
-            if (this.state.tasks.length === 0) {
-                console.log("No data found in local or cloud. Generating new mission...");
-                this.generateAllDaysTasks();
-            } else {
-                console.log(`Loaded ${this.state.tasks.length} tasks successfully.`);
-            }
-
-            // Hide loader
+            // HIDE LOADER NOW - Users see local data instantly
             const loader = document.getElementById('loader');
             if (loader) loader.classList.add('hidden');
             document.body.classList.add('ready');
             document.getElementById('user-selection').classList.remove('hidden');
 
-            // Sync initially
-            this.syncWithSupabase(true);
+            // Sync with Cloud in background
+            await this.syncWithSupabase(true);
             
+            // If still no tasks after sync, generate them
+            if (this.state.tasks.length === 0) {
+                console.log("No data. Generating new mission...");
+                this.generateAllDaysTasks();
+            }
+
             // Setup REAL-TIME subscription
             this.setupRealtimeSync();
         } catch (e) {
             console.error("Critical Init Error:", e);
-            // Emergency: hide loader so user sees SOME UI
             const loader = document.getElementById('loader');
             if (loader) loader.classList.add('hidden');
             document.getElementById('user-selection').classList.remove('hidden');
@@ -128,24 +122,26 @@ class App {
     }
 
     async pushToSupabase() {
-        try {
-            console.log("Pushing state to cloud...", this.state);
-            this.setSyncIndicator('syncing');
-            const { error } = await this.sb
-                .from('config')
-                .upsert({ id: 1, data: this.state });
-            
-            if (error) {
-                console.error("Supabase Upsert Error:", error);
+        // Debounce: avoid too many pushes in a few ms
+        if (this._pushTimeout) clearTimeout(this._pushTimeout);
+        this._pushTimeout = setTimeout(async () => {
+            try {
+                this.setSyncIndicator('syncing');
+                const { error } = await this.sb
+                    .from('config')
+                    .upsert({ id: 1, data: this.state });
+                
+                if (error) {
+                    console.error("Supabase Upsert Error:", error);
+                    this.setSyncIndicator('error');
+                } else {
+                    this.setSyncIndicator('success');
+                }
+            } catch (e) {
+                console.error("Push failed:", e);
                 this.setSyncIndicator('error');
-            } else {
-                console.log("Cloud Push Success ✅");
-                this.setSyncIndicator('success');
             }
-        } catch (e) {
-            console.error("Push failed:", e);
-            this.setSyncIndicator('error');
-        }
+        }, 500); // Wait 500ms for consecutive changes
     }
 
     setSyncIndicator(status) {
