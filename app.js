@@ -578,7 +578,7 @@ class App {
                     <button class="btn-cancel" style="background:#FF9800; color:white" onclick="window.app.rejectTask('${task.id}')">No hecha</button>
                     <button class="btn-confirm" style="background:var(--primary); color:white" onclick="window.app.validateTask('${task.id}')">Validar ✅</button>
                 </div>
-                <button class="secondary-btn" style="margin-top:12px; border:none; background:none; color:var(--text-muted); cursor:pointer" onclick="window.app.closeLegacyModal()">Cerrar</button>
+                <button class="secondary-btn" style="margin-top:12px; border:none; background:none; color:var(--text-muted); cursor:pointer" onclick="window.app.closeModal()">Cerrar</button>
             </div>
         `;
 
@@ -618,6 +618,37 @@ class App {
         this.showFeedback('Tarea validada con éxito.');
     }
 
+    async requestExtraTask() {
+        const options = [
+            { name: 'Preparar Comida', reward: 1.5 },
+            { name: 'Preparar Cena', reward: 1.5 },
+            { name: 'Cepillar a Kora', reward: 1.0 },
+            { name: 'Limpiar Nevera', reward: 2.0 },
+            { name: 'Ordenar Trastero/Cajones', reward: 2.0 }
+        ];
+
+        const list = options.map((o, i) => `${i + 1}. ${o.name} (+${o.reward.toFixed(2)}€)`).join('\n');
+        const choice = await this.showPrompt("Elegir Tarea Extra", `Opciones:\n${list}\n\nEscribe el número:`, "1");
+        
+        const idx = parseInt(choice) - 1;
+        if (options[idx]) {
+            const newTask = {
+                id: `extra-req-${Date.now()}`,
+                name: options[idx].name,
+                day: this.state.currentDay,
+                type: 'extra',
+                assigneeId: this.state.currentUser.id,
+                baseReward: options[idx].reward,
+                status: 'pending',
+                validation: null
+            };
+            this.state.tasks.push(newTask);
+            this.saveData();
+            this.renderDashboard();
+            await this.showAlert("Añadida", `¡Tarea "${newTask.name}" añadida a tu lista!`);
+        }
+    }
+
     async rejectTask(taskId) {
         const confirm = await this.showConfirm("Rechazar Tarea", "¿Quieres marcar esta tarea como 'No hecha' y volverla a poner libre?");
         if (!confirm) return;
@@ -642,7 +673,7 @@ class App {
         document.getElementById('instructions-modal').classList.remove('hidden');
     }
 
-    closeLegacyModal() {
+    closeModal() {
         document.getElementById('modal-container').classList.add('hidden');
     }
 
