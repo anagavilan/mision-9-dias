@@ -280,6 +280,24 @@ header p {
     border-color: var(--success);
 }
 
+.task-disabled {
+    opacity: 0.6 !important;
+    background: rgba(0,0,0,0.05) !important;
+    pointer-events: none;
+}
+
+.limit-msg {
+    font-size: 0.7rem;
+    color: var(--danger);
+    font-weight: 700;
+    text-align: center;
+    background: #fff;
+    padding: 6px 10px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+
 .modal-content {
     background: white;
     width: 100%;

@@ -270,23 +270,41 @@ class App {
             user.role !== 'admin'
         );
 
+        // Check 18:00h limit logic for free tasks
+        const now = new Date();
+        const hour = now.getHours();
+        const isBeforeRelease = hour < 18;
+        
+        const completedFreeToday = this.state.tasks.filter(t => 
+            t.day === this.state.currentDay && 
+            t.assigneeId === user.id && 
+            t.type === 'free' && 
+            t.status !== 'pending'
+        ).length;
+
+        const reachedLimit = isBeforeRelease && completedFreeToday >= 3;
+
         if (user.role === 'admin') {
             tasksList.innerHTML = '<p class="text-muted">Vista de administrador. Usa el panel inferior.</p>';
             return;
         }
 
-        tasksList.innerHTML = todayTasks.map(t => `
-            <div class="task-card ${t.status !== 'pending' ? 'status-done' : ''}">
-                <div class="task-main">
-                    <span class="task-type type-${t.type}">${t.type}</span>
-                    <span class="task-name">${t.name}</span>
-                    <span class="task-reward">${t.baseReward.toFixed(2)}€ base</span>
+        tasksList.innerHTML = todayTasks.map(t => {
+            const isDisabled = reachedLimit && t.type === 'free' && t.status === 'pending';
+            
+            return `
+                <div class="task-card ${t.status !== 'pending' ? 'status-done' : ''} ${isDisabled ? 'task-disabled' : ''}">
+                    <div class="task-main">
+                        <span class="task-type type-${t.type}">${t.type}</span>
+                        <span class="task-name">${t.name}</span>
+                        <span class="task-reward">${t.baseReward.toFixed(2)}€ base</span>
+                    </div>
+                    <div class="task-action">
+                        ${isDisabled ? '<span class="limit-msg">Límite (Max 3) hasta 18h</span>' : this.getTaskActionButton(t)}
+                    </div>
                 </div>
-                <div class="task-action">
-                    ${this.getTaskActionButton(t)}
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
     }
 
     getTaskActionButton(task) {
