@@ -181,6 +181,27 @@ class App {
         }
 
         this.renderTasks();
+
+        // Add "Pedir Tarea Extra" button for children
+        if (user.role !== 'admin') {
+            this.renderExtraTaskButton();
+        }
+    }
+
+    renderExtraTaskButton() {
+        const tasksSection = document.querySelector('.tasks-section');
+        let btn = document.getElementById('request-extra-btn');
+        if (!btn) {
+            btn = document.createElement('button');
+            btn.id = 'request-extra-btn';
+            btn.className = 'btn-save';
+            btn.style.width = '100%';
+            btn.style.marginTop = '20px';
+            btn.style.background = 'var(--accent)';
+            btn.innerText = '🚀 Pedir Tarea Extra (+1.50€)';
+            btn.onclick = () => this.requestExtraTask();
+            tasksSection.appendChild(btn);
+        }
     }
 
     nextDay() {
@@ -479,6 +500,37 @@ class App {
         this.closeModal();
         this.renderDashboard();
         this.showFeedback('Tarea validada con éxito.');
+    }
+
+    requestExtraTask() {
+        const options = [
+            { name: 'Preparar Comida', reward: 1.5 },
+            { name: 'Preparar Cena', reward: 1.5 },
+            { name: 'Lavar a Kora', reward: 2.0 },
+            { name: 'Limpiar Cristales', reward: 1.5 },
+            { name: 'Ordenar Trastero/Cajones', reward: 2.0 }
+        ];
+
+        const list = options.map((o, i) => `${i + 1}. ${o.name} (+${o.reward}€)`).join('\n');
+        const choice = prompt(`Elige una tarea extra para hoy:\n\n${list}\n\nEscribe el número:`);
+        
+        const idx = parseInt(choice) - 1;
+        if (options[idx]) {
+            const newTask = {
+                id: `extra-req-${Date.now()}`,
+                name: options[idx].name,
+                day: this.state.currentDay,
+                type: 'extra',
+                assigneeId: this.state.currentUser.id,
+                baseReward: options[idx].reward,
+                status: 'pending',
+                validation: null
+            };
+            this.state.tasks.push(newTask);
+            this.saveData();
+            this.renderDashboard();
+            this.showFeedback(`¡Tarea "${newTask.name}" añadída a tu lista!`);
+        }
     }
 
     openInstructions() {
