@@ -648,7 +648,7 @@ class App {
                 ${this.renderRanking()}
             </div>
 
-            <h3 style="margin-top:20px">Validaciones Pendientes</h3>
+            <h3 style="margin-top:20px">📥 Validaciones Pendientes</h3>
         `;
 
         let listHtml = '';
@@ -668,27 +668,46 @@ class App {
                 `;
             }).join('');
         }
+
+        const validated = this.state.tasks.filter(t => t.day === this.state.currentDay && t.status === 'validated');
+        let historyHtml = `
+            <h3 style="margin-top:30px">✅ Registro de Hoy (Día ${this.state.currentDay})</h3>
+            <div class="tasks-grid">
+                ${validated.length === 0 ? '<p class="text-muted">No hay tareas validadas hoy.</p>' : 
+                    validated.map(t => {
+                        const user = USERS.find(u => u.id === t.assigneeId);
+                        const v = t.validation || {};
+                        const stars = '⭐'.repeat(v.quality || 0);
+                        const attitude = v.attitude === 3 ? '😊' : (v.attitude === 1 ? '😠' : '😐');
+                        return `
+                            <div class="task-card status-done" style="opacity: 0.8">
+                                <div class="task-main">
+                                    <span class="task-name">${t.name}</span>
+                                    <span class="user-badge">${user ? user.name : '?' }</span>
+                                    <div style="font-size:0.75rem; color:var(--text-muted)">
+                                        ${stars} ${attitude} 💰 ${v.totalReward ? v.totalReward.toFixed(2) : '?' }€
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')
+                }
+            </div>
+        `;
         
-        // If it's already full, just update the list to preserve scroll better
-        if (adminPanel.querySelector('.admin-controls')) {
-            // Update Ranking
-            const rankingDiv = adminPanel.querySelector('.admin-ranking');
-            if (rankingDiv) rankingDiv.innerHTML = `<h3>🏆 Posiciones Actuales</h3>` + this.renderRanking();
-            // Update List
-            const listContainer = document.getElementById('pending-validation-list');
-            if (listContainer) listContainer.innerHTML = listHtml;
-        } else {
-            // Full render first time
-            adminPanel.innerHTML = `
-                <div class="section-title"><h2>Panel de Control</h2></div>
-                ${controlsHtml}
-                <div id="pending-validation-list" class="tasks-grid">
-                    ${listHtml}
-                </div>
-            `;
-        }
+        // Final Assembly
+        adminPanel.innerHTML = `
+            <div class="section-title"><h2>Panel de Control</h2></div>
+            ${controlsHtml}
+            <div id="pending-validation-list" class="tasks-grid">
+                ${listHtml}
+            </div>
+            <div id="validated-history-list">
+                ${historyHtml}
+            </div>
+        `;
         
-        window.scrollTo(0, scrollPos); // RESTORE SCROLL
+        window.scrollTo(0, scrollPos);
     }
 
     renderRanking() {
@@ -868,8 +887,11 @@ class App {
                 validation: null
             };
             this.state.tasks.push(newTask);
-            this.saveData();
+            this.saveData(false);
             this.renderDashboard();
+            
+            // GRANULAR PUSH (v8.6)
+            await this.pushTaskUpdate(newTask.id);
             await this.showAlert("Añadida", `¡Tarea "${newTask.name}" añadida a tu lista!`);
         }
     }
