@@ -68,11 +68,31 @@ class App {
             const cloudData = await response.json();
             
             if (cloudData && cloudData.tasks) {
-                // Merge logic could be complex, but for now we trust cloud if it's newer
-                // Simple overwrite for this demo
-                this.state = { ...this.state, ...cloudData };
-                this.saveData(false); // Save local without triggering another cloud sync
-                console.log("Synced from cloud");
+                const statusOrder = { 'pending': 0, 'done': 1, 'validated': 2 };
+                
+                // Merge tasks safely
+                const mergedTasks = [...this.state.tasks];
+                
+                cloudData.tasks.forEach(cloudTask => {
+                    const localIdx = mergedTasks.findIndex(t => t.id === cloudTask.id);
+                    if (localIdx === -1) {
+                        mergedTasks.push(cloudTask);
+                    } else {
+                        const localTask = mergedTasks[localIdx];
+                        const localOrder = statusOrder[localTask.status] || 0;
+                        const cloudOrder = statusOrder[cloudTask.status] || 0;
+                        
+                        if (cloudOrder > localOrder) {
+                            mergedTasks[localIdx] = cloudTask;
+                        }
+                    }
+                });
+
+                this.state.tasks = mergedTasks;
+                this.state.currentDay = Math.max(this.state.currentDay, cloudData.currentDay || 1);
+                
+                this.saveData(false);
+                if (this.state.currentUser) this.renderDashboard();
             }
         } catch (e) {
             console.error("Cloud sync failed", e);
@@ -502,9 +522,10 @@ class App {
                 <input type="number" id="input-penalty" value="0" step="0.1" min="0">
 
                 <div class="modal-actions">
-                    <button class="btn-cancel" onclick="window.app.closeModal()">Cerrar</button>
+                    <button class="btn-cancel" style="background:#FFE0B2; color:#E65100" onclick="window.app.rejectTask('${task.id}')">Rechazar / No hecha</button>
                     <button class="btn-confirm" onclick="window.app.validateTask('${task.id}')">Validar y Pagar</button>
                 </div>
+                <button class="secondary-btn" style="margin-top:12px" onclick="window.app.closeModal()">Cerrar sin cambios</button>
             </div>
         `;
 
@@ -542,6 +563,22 @@ class App {
         this.closeModal();
         this.renderDashboard();
         this.showFeedback('Tarea validada con éxito.');
+    }
+
+    rejectTask(taskId) {
+        const task = this.state.tasks.find(t => t.id === taskId);
+        if (task) {
+            task.status = 'pending';
+            // If it was a free task, it becomes available again for everyone
+            if (task.type === 'free') {
+                task.assigneeId = null;
+            }
+            task.validation = null;
+            this.saveData();
+            this.closeModal();
+            this.renderDashboard();
+            this.showFeedback('Tarea devuelta a estado pendiente.');
+        }
     }
 
     requestExtraTask() {
