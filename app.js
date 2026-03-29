@@ -46,15 +46,18 @@ class App {
             this.generateAllDaysTasks();
         }
         
-        await this.syncWithCloud(); // Try to sync on start
-        
+        // Render and setup listeners IMMEDIATELY so UI is interactive
         this.renderUserSelection();
         this.setupEventListeners();
         
-        // Hide loader
+        // Hide loader early
         document.body.classList.add('ready');
         document.getElementById('loader').classList.add('hidden');
         document.getElementById('user-selection').classList.remove('hidden');
+
+        // Sync in the background or await it if you want, but UI is already ready
+        await this.syncWithCloud();
+        this.renderUserSelection(); // Re-render if cloud data changed
     }
 
     async syncWithCloud() {
