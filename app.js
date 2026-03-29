@@ -235,20 +235,20 @@ class App {
     calculateEarnings(userId) {
         return this.state.tasks
             .filter(t => t.assigneeId === userId && t.status === 'validated')
-            .reduce((acc, t) => {
-                let reward = t.baseReward; // Base 0.50 for normal tasks
-                if (t.validation) {
-                    // Quality factor: +0.25 if stars >= 3 (well done)
-                    const qBonus = t.validation.quality === 3 ? 0.25 : 0.0;
-                    // Attitude factor: +0.25 if emoji is happy, or penalty if angry
-                    let aBonus = 0;
-                    if (t.validation.attitude === 3) aBonus = 0.25;
-                    else if (t.validation.attitude === 1) aBonus = -0.50; // Max penalty mentioned in instructions
-                    
                     reward = t.baseReward + qBonus + aBonus - (t.validation.penalty || 0);
                 }
                 return acc + Math.max(0, reward);
             }, 0);
+
+        // EXTRA BONUS: All fixed tasks (9 days) validated?
+        const fixedTasks = this.state.tasks.filter(t => t.assigneeId === userId && t.type === 'fixed');
+        const allValidated = fixedTasks.length > 0 && fixedTasks.every(t => t.status === 'validated');
+        
+        if (allValidated) {
+            total += 5.0; // 5€ Perseverance Bonus
+        }
+        
+        return total;
     }
 
     renderTasks() {
@@ -368,14 +368,23 @@ class App {
 
         return `
             <div class="ranking-list">
-                ${rankings.map((u, i) => `
-                    <div class="ranking-item">
-                        <span class="rank-pos">${i === 0 ? '🥇' : (i === 1 ? '🥈' : '🥉')}</span>
-                        <span class="rank-name">${u.name}</span>
-                        <span class="rank-total">${u.total.toFixed(2)}€</span>
-                        <span class="rank-bonus">+${i === 0 ? '5' : (i === 1 ? '3' : '1')}€ Bonus</span>
-                    </div>
-                `).join('')}
+                ${rankings.map((u, i) => {
+                    const fixed = this.state.tasks.filter(t => t.assigneeId === USERS.find(user => user.name === u.name).id && t.type === 'fixed');
+                    const valCount = fixed.filter(t => t.status === 'validated').length;
+                    const isPerfect = fixed.length > 0 && valCount === fixed.length;
+                    
+                    return `
+                        <div class="ranking-item ${isPerfect ? 'perfect-score' : ''}">
+                            <span class="rank-pos">${i === 0 ? '🥇' : (i === 1 ? '🥈' : '🥉')}</span>
+                            <span class="rank-name">${u.name} ${isPerfect ? '🔥' : ''}</span>
+                            <span class="rank-total">${u.total.toFixed(2)}€</span>
+                            <div class="rank-details">
+                                <span class="rank-bonus">+${i === 0 ? '5' : (i === 1 ? '3' : '1')}€ Posición</span>
+                                ${isPerfect ? '<span class="rank-bonus" style="background:var(--success)">+5€ Constancia!</span>' : `<span class="rank-subtext">${valCount}/9 días fijos</span>`}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
             </div>
         `;
     }
