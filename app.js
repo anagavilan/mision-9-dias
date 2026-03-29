@@ -291,10 +291,18 @@ class App {
 
     getTaskActionButton(task) {
         if (task.status === 'validated') {
-            return `<span class="task-badge badge-validated">Validado ✓</span>`;
+            let reward = task.baseReward;
+            if (task.validation) {
+                const qBonus = task.validation.quality === 3 ? 0.25 : 0.0;
+                let aBonus = 0;
+                if (task.validation.attitude === 3) aBonus = 0.25;
+                else if (task.validation.attitude === 1) aBonus = -0.50;
+                reward = task.baseReward + qBonus + aBonus - (task.validation.penalty || 0);
+            }
+            return `<span class="task-badge badge-validated">💰 +${Math.max(0, reward).toFixed(2)}€</span>`;
         }
         if (task.status === 'done') {
-            return `<span class="task-badge badge-done">Hecho (Espera Admin)</span>`;
+            return `<span class="task-badge badge-done">⌛ Revisando...</span>`;
         }
         return `<button class="btn-done" onclick="window.app.markAsDone('${task.id}')">Hecho</button>`;
     }
