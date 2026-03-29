@@ -86,7 +86,15 @@ class App {
                 throw new Error(`Servidor respondió con código ${response.status}`);
             }
 
-            const cloudData = await response.json();
+            // Using text() and parsing manually is more robust for Apps Script CORS
+            const rawText = await response.text();
+            let cloudData;
+            try {
+                cloudData = JSON.parse(rawText);
+            } catch (parseErr) {
+                console.error("Parse Error:", rawText);
+                throw new Error("La nube no devolvió un JSON válido. Comprueba el código del Script.");
+            }
             
             if (cloudData && (cloudData.tasks || cloudData.generationId)) {
                 const cloudGen = cloudData.generationId || 0;
@@ -440,6 +448,10 @@ class App {
                     <button class="btn-save" style="background:#5D4037" onclick="window.app.syncWithCloud()">🔄 Forzar Sincronización</button>
                     <button class="btn-save" style="background:#8E735B" onclick="window.app.addExtraTask()">+ Añadir Extra/Sorpresa</button>
                     <button class="btn-save" style="background:#D32F2F" onclick="window.app.resetTasks()">⚠ Reiniciar Todas las Tareas</button>
+                    <div style="display:flex; gap:10px; margin-top:10px">
+                        <button class="btn-save" style="background:#455A64; flex:1" onclick="window.app.exportData()">📤 Exportar (Copia)</button>
+                        <button class="btn-save" style="background:#455A64; flex:1" onclick="window.app.importData()">📥 Importar</button>
+                    </div>
                 </div>
             </div>
             
@@ -693,8 +705,37 @@ class App {
     }
 
     showFeedback(msg) {
-        // Simple alert for now, could be a toast
         alert(msg);
+    }
+
+    exportData() {
+        const data = JSON.stringify(this.state);
+        const el = document.createElement('textarea');
+        el.value = data;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        alert("✓ Datos copiados al portapapeles. Puedes pegarlos en otro móvil.");
+    }
+
+    importData() {
+        const json = prompt("Pega aquí los datos exportados:");
+        if (json) {
+            try {
+                const imported = JSON.parse(json);
+                if (imported.tasks && imported.generationId) {
+                    this.state = imported;
+                    this.saveData();
+                    this.renderDashboard();
+                    alert("✓ Datos importados con éxito.");
+                } else {
+                    throw new Error("Formato inválido.");
+                }
+            } catch (e) {
+                alert("❌ Error al importar: Datos no válidos.");
+            }
+        }
     }
 }
 
