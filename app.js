@@ -71,7 +71,15 @@ class App {
         }
 
         try {
-            const response = await fetch(this.state.cloudUrl);
+            const response = await fetch(this.state.cloudUrl, {
+                method: 'GET',
+                redirect: 'follow'
+            });
+            
+            if (!response.ok) {
+                throw new Error(`Servidor respondió con código ${response.status}`);
+            }
+
             const cloudData = await response.json();
             
             if (cloudData && (cloudData.tasks || cloudData.generationId)) {
@@ -127,7 +135,12 @@ class App {
             }
         } catch (e) {
             console.error("Cloud sync failed", e);
-            this.showFeedback("❌ Error al sincronizar. Revisa la conexión.");
+            let errorMsg = "❌ Error de conexión.";
+            if (e.message.includes("JSON")) errorMsg = "❌ Error en el formato de datos de la nube.";
+            else if (e.message.includes("status")) errorMsg = `❌ Error del servidor (${e.message})`;
+            else if (e.message.includes("fetch") || e.name === "TypeError") errorMsg = "❌ Error de red o CORS. Revisa si el Script está como 'Anyone'.";
+            
+            this.showFeedback(`${errorMsg}\nDetalle: ${e.message}`);
         } finally {
             if (btn) {
                 btn.innerText = "🔄 Forzar Sincronización";
