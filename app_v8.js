@@ -193,6 +193,7 @@ class App {
 
         try {
             this.setSyncIndicator('syncing');
+            this.logDebug(`Subiendo tarea ${taskId}...`);
             const { error } = await this.sb.from('tasks').upsert({
                 id: task.id, 
                 day: task.day, 
@@ -206,11 +207,21 @@ class App {
             });
 
             if (error) throw error;
+            this.logDebug(`✅ Tarea ${taskId} ok`);
             this.setSyncIndicator('success');
         } catch (e) {
-            console.error("Atomic Push Error:", e);
+            this.logDebug(`❌ Error Tarea: ${e.message}`);
             this.setSyncIndicator('error', 'Fallo al guardar tarea');
         }
+    }
+
+    logDebug(msg) {
+        const log = document.getElementById('debug-log');
+        if (log) {
+            log.innerHTML += `<br>[${new Date().toLocaleTimeString()}] ${msg}`;
+            log.scrollTop = log.scrollHeight;
+        }
+        console.log("DEBUG:", msg);
     }
 
     // Keep original pushToSupabase for massive changes (like resets)
@@ -600,18 +611,18 @@ class App {
                 <div class="quick-actions">
                     <div id="sync-indicator" style="font-size:0.7rem; text-align:center; color:var(--text-muted); margin-bottom:10px; transition: opacity 0.5s">Sincronizado</div>
                     <button class="btn-save" style="background:#4CAF50" onclick="window.app.syncWithSupabase()">🔄 Sincronizar Ahora</button>
-                    <button class="btn-save" style="background:#8E735B" onclick="window.app.addExtraTask()">+ Añadir Extra/Sorpresa</button>
-                    <button class="btn-save" style="background:#D32F2F" onclick="window.app.resetTasks()">⚠ Reiniciar Todo</button>
+                    <button class="btn-save" style="background:#8E735B" onclick="window.app.renderRequestExtraModal()">+ Añadir Extra/Sorpresa</button>
+                    <button class="btn-save" style="background:#D32F2F; border: 3px solid white" onclick="window.app.nuclearReset()">☢️ ALINEAR TODA LA FAMILIA (Nuclear)</button>
                     
                     <details style="margin-top:15px; color:var(--text-muted); font-size:0.9rem">
                         <summary style="cursor:pointer">⚙️ Opciones Avanzadas</summary>
+                        <div id="debug-log" style="font-size:0.5rem; background:rgba(0,0,0,0.2); padding:5px; margin-top:5px; max-height:100px; overflow-y:auto; font-family:monospace">Logs de Sincro: Iniciado v6.2.0</div>
                         <div style="display:flex; flex-direction:column; gap:10px; margin-top:10px">
                             <div style="display:flex; gap:10px">
                                 <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.exportData()">📤 Exportar</button>
                                 <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.importData()">📥 Importar</button>
                             </div>
                             <button class="btn-save" style="background:#607D8B; font-size:0.8rem" onclick="window.app.clearLocalAndSync()">🔄 Forzar Recuperación Nube</button>
-                            <button class="btn-save" style="background:#D32F2F; font-size:0.8rem" onclick="window.app.nuclearReset()">☢️ REINICIAR Y ALINEAR IDS (Nuclear)</button>
                         </div>
                     </details>
                 </div>
