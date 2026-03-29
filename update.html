@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Actualizando Misión Kora...</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 50px; background: #5D4037; color: white; }
+        .loader { border: 8px solid #f3f3f3; border-top: 8px solid #8E735B; border-radius: 50%; width: 50px; height: 50px; animation: spin 2s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <h1>Limpiando memoria antigua...</h1>
+    <div class="loader"></div>
+    <p id="status">Buscando rastros de la versión vieja...</p>
+
+    <script>
+        async function nuclearUpdate() {
+            try {
+                // 1. Matar Service Workers
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for(let registration of registrations) {
+                        await registration.unregister();
+                        document.getElementById('status').innerText = "Caché de Julia y Alex eliminada...";
+                    }
+                }
+                
+                // 2. Limpiar Caches de la API
+                if ('caches' in window) {
+                    const keys = await caches.keys();
+                    for(let key of keys) {
+                        await caches.delete(key);
+                    }
+                }
+
+                document.getElementById('status').innerText = "¡Listo! Redirigiendo a la nueva versión...";
+                
+                setTimeout(() => {
+                    window.location.href = "index.html?v=" + Date.now();
+                }, 1000);
+
+            } catch (e) {
+                document.getElementById('status').innerText = "Error, intenta refrescar esta página manualmente.";
+            }
+        }
+        nuclearUpdate();
+    </script>
+</body>
+</html>
