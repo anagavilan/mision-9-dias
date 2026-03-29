@@ -47,20 +47,27 @@ class App {
     async init() {
         try {
             this.registerServiceWorker();
-            this.loadData();
+            this.loadData(); // Load local first for speed
             
-            // Ensure tasks always exists
+            // Ensure tasks array exists
             if (!this.state.tasks) this.state.tasks = [];
             
-            if (this.state.tasks.length === 0) {
-                this.generateAllDaysTasks();
-            }
-            
-            // Render and setup listeners IMMEDIATELY so UI is interactive
+            // Render basic UI immediately
             this.renderUserSelection();
             this.setupEventListeners();
             
-            // Hide loader early
+            // Sync with Cloud (Priority)
+            await this.syncWithSupabase(true);
+            
+            // If still no tasks after sync, generate them
+            if (this.state.tasks.length === 0) {
+                console.log("No data found in local or cloud. Generating new mission...");
+                this.generateAllDaysTasks();
+            } else {
+                console.log(`Loaded ${this.state.tasks.length} tasks successfully.`);
+            }
+
+            // Hide loader
             const loader = document.getElementById('loader');
             if (loader) loader.classList.add('hidden');
             document.body.classList.add('ready');
@@ -602,16 +609,8 @@ class App {
         `;
     }
 
-    async saveCloudUrl() {
-        let url = document.getElementById('cloud-url-input').value.trim();
-        if (url && !url.includes('exec')) {
-            await this.showAlert("Atención", "La URL de Apps Script suele terminar en '/exec'.");
-        }
-        this.state.cloudUrl = url;
-        this.saveData();
-        await this.showAlert("Guardado", "✓ Configuración de la nube actualizada.");
-        this.renderDashboard();
-    }
+    // Removed obsolete saveCloudUrl method as we now use Supabase constants
+
 
     addExtraTask() {
         const name = prompt("Nombre de la tarea Extra/Sorpresa:");
