@@ -163,8 +163,17 @@ class App {
                 if (cloudTask.status === 'validated' || 
                    (cloudTask.status === 'done' && localTask.status === 'pending')) {
                     mergedTasks[localIdx] = cloudTask;
-            this.showSyncStatus("Sincronizado");
-        }
+                }
+            }
+        });
+
+        this.state.tasks = mergedTasks;
+        this.state.currentDay = Math.max(this.state.currentDay, cloudData.currentDay || 1);
+        this.state.earnings = cloudData.earnings || this.state.earnings;
+        
+        this.saveData(false); // Save locally without pushing back
+        this.renderDashboard();
+        this.showSyncStatus("Sincronizado");
     }
 
     showSyncStatus(msg) {
