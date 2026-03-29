@@ -82,83 +82,139 @@ class App {
     }
 
     setupRealtimeSync() {
-        // Use a unique channel ID to avoid conflicts
         const channelId = `mision_${Math.random().toString(36).slice(2, 7)}`;
         if (this.channel) this.sb.removeChannel(this.channel);
         
         this.channel = this.sb.channel(channelId)
+            // Listen for Global Config changes
             .on('postgres_changes', { event: '*', schema: 'public', table: 'config' }, payload => {
-                if (payload.new && payload.new.data) {
-                    console.log("Real-time Update Received 📢");
-                    this.mergeData(payload.new.data, false, true);
+                if (payload.new) {
+                    this.state.current_day = payload.new.current_day || this.state.current_day;
+                    this.state.earnings = payload.new.earnings || this.state.earnings;
                     this.renderDashboard();
                 }
             })
-            .subscribe(status => {
-                if (status === 'SUBSCRIBED') {
-                    this.setSyncIndicator('success');
-                } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-                    console.error("Real-time Subscription Error:", status);
-                    this.setSyncIndicator('error', `Error Real-time: ${status}. Revisa que 'Realtime' esté ON en Supabase.`);
+            // Listen for INDIVIDUAL task changes (The granular part!)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, payload => {
+                if (payload.new) {
+                    this.handleRealtimeTaskUpdate(payload.new);
                 }
+            })
+            .subscribe(status => {
+                if (status === 'SUBSCRIBED') this.setSyncIndicator('success');
+                else if (status === 'CHANNEL_ERROR') this.setSyncIndicator('error', 'Error de canal Real-time');
             });
     }
 
     async syncWithSupabase(isInitial = false) {
         if (!isInitial) this.showSyncStatus("Sincronizando...");
         try {
-            const { data, error } = await this.sb
-                .from('config')
-                .select('data')
-                .eq('id', 1)
-                .single();
+            // 1. Fetch Global Config (ID 1)
+            const { data: configData, error: configError } = await this.sb
+                .from('config').select('current_day, earnings, generation_id').eq('id', 1).single();
             
-            if (error && error.code !== 'PGRST116') throw error;
+            if (configError && configError.code !== 'PGRST116') throw configError;
 
-            if (data && data.data) {
-                this.mergeData(data.data, isInitial);
-            } else if (isInitial) {
-                // Table is empty, create first row
-                await this.pushToSupabase();
+            // 2. Fetch All Tasks from the NEW granular table
+            const { data: cloudTasks, error: tasksError } = await this.sb
+                .from('tasks').select('*');
+            
+            if (tasksError) throw tasksError;
+
+            if (configData) {
+                this.state.currentDay = configData.current_day || 1;
+                this.state.earnings = configData.earnings || this.state.earnings;
+                this.state.generationId = configData.generation_id || this.state.generationId;
             }
+
+            if (cloudTasks && cloudTasks.length > 0) {
+                // Map DB columns to our local state structure
+                this.state.tasks = cloudTasks.map(t => ({
+                    id: t.id,
+                    day: t.day,
+                    assigneeId: t.assignee_id,
+                    name: t.name,
+                    type: t.type,
+                    status: t.status,
+                    baseReward: t.base_reward,
+                    validation: t.validation
+                }));
+            } else if (isInitial && this.state.tasks.length > 0) {
+                // If cloud is empty but local has tasks, migrate them to the new table
+                console.log("Migrating local tasks to granular table...");
+                await this.pushAllTasksToCloud();
+            }
+
+            this.saveData(false); // Update local cache
+            this.renderDashboard();
             if (!isInitial) this.showSyncStatus("Sincronizado");
             this.setSyncIndicator('success');
         } catch (e) {
-            console.error("Sync Error:", e);
-            this.lastError = e.message || "Error desconocido";
-            this.setSyncIndicator('error', `Fallo al conectar con la nube: ${this.lastError}`);
+            console.error("Deep Sync Error:", e);
+            this.setSyncIndicator('error', `Fallo de Sincro: ${e.message}`);
         }
     }
 
-    async pushToSupabase() {
-        // Increment generation ID on every local change to mark this as "the latest world"
-        this.state.generationId = Date.now();
-        
-        if (this._pushTimeout) clearTimeout(this._pushTimeout);
-        this._pushTimeout = setTimeout(async () => {
-            try {
-                this.setSyncIndicator('syncing');
-                // Deep Sync before push to avoid overwriting others
-                const { data: cloudData } = await this.sb.from('config').select('data').eq('id', 1).single();
-                if (cloudData && cloudData.data) {
-                    this.mergeData(cloudData.data, false, true); // Partial merge without render to get latest IDs
-                }
+    async pushAllTasksToCloud() {
+        // Migration helper: pushes all local tasks as individual rows
+        try {
+            const rows = this.state.tasks.map(t => ({
+                id: t.id, day: t.day, assignee_id: t.assigneeId, 
+                name: t.name, type: t.type, status: t.status, 
+                base_reward: t.baseReward, validation: t.validation
+            }));
+            
+            const { error } = await this.sb.from('tasks').upsert(rows);
+            if (error) throw error;
+            
+            // Push global config too
+            await this.pushGlobalConfig();
+        } catch (e) {
+            console.error("Migration Fail:", e);
+        }
+    }
 
-                const { error } = await this.sb
-                    .from('config')
-                    .upsert({ id: 1, data: this.state });
-                
-                if (error) {
-                    console.error("Supabase Error:", error);
-                    this.setSyncIndicator('error');
-                } else {
-                    this.setSyncIndicator('success');
-                }
-            } catch (e) {
-                console.error("Push Error:", e);
-                this.setSyncIndicator('error');
-            }
-        }, 800); 
+    async pushGlobalConfig() {
+        try {
+            await this.sb.from('config').upsert({
+                id: 1, 
+                current_day: this.state.currentDay, 
+                earnings: this.state.earnings,
+                generation_id: this.state.generationId
+            });
+        } catch (e) { console.error("Global push fail:", e); }
+    }
+
+    async pushTaskUpdate(taskId) {
+        const task = this.state.tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        try {
+            this.setSyncIndicator('syncing');
+            const { error } = await this.sb.from('tasks').upsert({
+                id: task.id, 
+                day: task.day, 
+                assignee_id: task.assigneeId,
+                name: task.name, 
+                type: task.type, 
+                status: task.status, 
+                base_reward: task.baseReward,
+                validation: task.validation,
+                last_update: new Date()
+            });
+
+            if (error) throw error;
+            this.setSyncIndicator('success');
+        } catch (e) {
+            console.error("Atomic Push Error:", e);
+            this.setSyncIndicator('error', 'Fallo al guardar tarea');
+        }
+    }
+
+    // Keep original pushToSupabase for massive changes (like resets)
+    async pushToSupabase() {
+        this.setSyncIndicator('syncing');
+        await this.pushAllTasksToCloud();
     }
 
     setSyncIndicator(status, errorMsg = '') {
@@ -174,47 +230,31 @@ class App {
     }
 
     mergeData(cloudData, isInitial = false, isQuiet = false) {
+        // This method is now legacy as we sync via tables, but kept for deep compatibility
         if (!cloudData) return;
+        this.renderDashboard();
+    }
 
-        const cloudGen = cloudData.generationId || 0;
-        const localGen = this.state.generationId || 0;
+    // NEW: Handle real-time updates for individual tasks
+    handleRealtimeTaskUpdate(cloudTask) {
+        const idx = this.state.tasks.findIndex(t => t.id === cloudTask.id);
+        const incomingTask = {
+            id: cloudTask.id, day: cloudTask.day, assigneeId: cloudTask.assignee_id,
+            name: cloudTask.name, type: cloudTask.type, status: cloudTask.status,
+            baseReward: cloudTask.base_reward, validation: cloudTask.validation
+        };
 
-        // If cloud generation is DIFFERENT, we must merge carefully
-        // If it's much newer (e.g. from a reset), we might consider overwriting
-        
-        const mergedTasks = [...this.state.tasks];
-        let changed = false;
-
-        cloudData.tasks.forEach(cloudTask => {
-            const localIdx = mergedTasks.findIndex(t => t.id === cloudTask.id);
-            if (localIdx === -1) {
-                mergedTasks.push(cloudTask);
-                changed = true;
-            } else {
-                const localTask = mergedTasks[localIdx];
-                // Priority: validated > done > pending
-                // ALSO: if cloud task was changed, update it
-                if (cloudTask.status !== localTask.status) {
-                    const statusOrder = { 'pending': 0, 'done': 1, 'validated': 2 };
-                    if (statusOrder[cloudTask.status] > statusOrder[localTask.status]) {
-                        mergedTasks[localIdx] = cloudTask;
-                        changed = true;
-                    }
-                }
+        if (idx === -1) {
+            this.state.tasks.push(incomingTask);
+        } else {
+            // Merge logic: validated > done > pending
+            const statusOrder = { 'pending': 0, 'done': 1, 'validated': 2 };
+            if (statusOrder[incomingTask.status] >= statusOrder[this.state.tasks[idx].status]) {
+                this.state.tasks[idx] = incomingTask;
             }
-        });
-
-        if (changed || cloudGen > localGen) {
-            this.state.tasks = mergedTasks;
-            this.state.currentDay = Math.max(this.state.currentDay, cloudData.currentDay || 1);
-            this.state.earnings = cloudData.earnings || this.state.earnings;
-            this.state.generationId = Math.max(localGen, cloudGen);
-            
-            this.saveData(false);
-            if (!isQuiet) this.renderDashboard();
         }
-        
-        if (!isQuiet) this.showSyncStatus("Sincronizado");
+        this.saveData(false);
+        this.renderDashboard();
     }
 
     showSyncStatus(msg) {
