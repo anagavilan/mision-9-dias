@@ -313,7 +313,7 @@ class App {
             footer.style.paddingBottom = '20px';
             document.getElementById('dashboard').appendChild(footer);
         }
-        footer.innerText = 'v5.0.3 · Supabase Real-time';
+        footer.innerText = 'v6.0.0 · Supabase Real-time';
     }
 
     renderExtraTaskButton() {
@@ -494,6 +494,7 @@ class App {
                     
                     <details style="margin-top:15px; color:var(--text-muted); font-size:0.9rem">
                         <summary style="cursor:pointer">⚙️ Opciones Avanzadas</summary>
+                        <div style="margin-top:10px; font-size:0.6rem; opacity:0.5; text-align:center">Versión Supabase Real-time v6.0.0</div>
                         <div style="display:flex; gap:10px; margin-top:10px">
                             <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.exportData()">📤 Exportar</button>
                             <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.importData()">📥 Importar</button>
