@@ -233,19 +233,26 @@ class App {
     }
 
     calculateEarnings(userId) {
-        return this.state.tasks
+        let total = this.state.tasks
             .filter(t => t.assigneeId === userId && t.status === 'validated')
+            .reduce((acc, t) => {
+                let reward = t.baseReward;
+                if (t.validation) {
+                    const qBonus = t.validation.quality === 3 ? 0.25 : 0.0;
+                    let aBonus = 0;
+                    if (t.validation.attitude === 3) aBonus = 0.25;
+                    else if (t.validation.attitude === 1) aBonus = -0.50;
+                    
                     reward = t.baseReward + qBonus + aBonus - (t.validation.penalty || 0);
                 }
                 return acc + Math.max(0, reward);
             }, 0);
 
-        // EXTRA BONUS: All fixed tasks (9 days) validated?
         const fixedTasks = this.state.tasks.filter(t => t.assigneeId === userId && t.type === 'fixed');
         const allValidated = fixedTasks.length > 0 && fixedTasks.every(t => t.status === 'validated');
         
         if (allValidated) {
-            total += 5.0; // 5€ Perseverance Bonus
+            total += 5.0;
         }
         
         return total;
