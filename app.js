@@ -64,31 +64,34 @@ class App {
     async syncWithCloud() {
         if (!this.state.cloudUrl) return;
         
+        const btn = document.querySelector('button[onclick="window.app.syncWithCloud()"]');
+        if (btn) {
+            btn.innerText = "⌛ Sincronizando...";
+            btn.disabled = true;
+        }
+
         try {
             const response = await fetch(this.state.cloudUrl);
             const cloudData = await response.json();
             
             if (cloudData && (cloudData.tasks || cloudData.generationId)) {
-                // STRICT GENERATION SYNC
-                // If cloud has a different generation, the newer one ALWAYS wins completely
                 const cloudGen = cloudData.generationId || 0;
                 const localGen = this.state.generationId || 0;
 
                 if (cloudGen > localGen) {
-                    console.log("Cloud has newer generation. Overwriting local state.");
                     this.state = { ...this.state, ...cloudData };
                     this.saveData(false);
                     if (this.state.currentUser) this.renderDashboard();
+                    this.showFeedback("✓ Datos actualizados desde la nube.");
                     return;
                 }
                 
                 if (localGen > cloudGen) {
-                    console.log("Local state is newer. Pushing to cloud.");
-                    this.pushToCloud();
+                    await this.pushToCloud();
+                    this.showFeedback("✓ Tus datos son más actuales. Subidos a la nube.");
                     return;
                 }
 
-                // If same generation, perform smart task merge
                 const statusOrder = { 'pending': 0, 'done': 1, 'validated': 2 };
                 let hasChanges = false;
                 const mergedTasks = [...this.state.tasks];
@@ -115,10 +118,21 @@ class App {
                     this.state.currentDay = Math.max(this.state.currentDay, cloudData.currentDay || 1);
                     this.saveData(false);
                     if (this.state.currentUser) this.renderDashboard();
+                    this.showFeedback("✓ Tareas sincronizadas correctamente.");
+                } else {
+                    this.showFeedback("ℹ Todo está al día.");
                 }
+            } else {
+                this.showFeedback("⚠ La nube está vacía o sin datos.");
             }
         } catch (e) {
             console.error("Cloud sync failed", e);
+            this.showFeedback("❌ Error al sincronizar. Revisa la conexión.");
+        } finally {
+            if (btn) {
+                btn.innerText = "🔄 Forzar Sincronización";
+                btn.disabled = false;
+            }
         }
     }
 
@@ -499,14 +513,17 @@ class App {
         this.renderDashboard();
     }
 
-    resetTasks() {
+    async resetTasks() {
         if (confirm("¿Seguro que quieres borrar todo y empezar de cero con la nueva lista de tareas?")) {
             this.state.generationId = Date.now();
             this.state.tasks = [];
             this.generateAllDaysTasks();
             this.state.currentDay = 1;
-            this.saveData();
+            this.saveData(); // Calls sync push
             this.renderDashboard();
+            this.showFeedback("✓ Aplicación reiniciada. Se está sincronizando con la nube.");
+            // Wait a bit and sync again to be sure
+            setTimeout(() => this.syncWithCloud(), 2000);
         }
     }
 
