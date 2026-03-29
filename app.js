@@ -117,26 +117,34 @@ class App {
     }
 
     async pushToSupabase() {
-        // Debounce: avoid too many pushes in a few ms
+        // Increment generation ID on every local change to mark this as "the latest world"
+        this.state.generationId = Date.now();
+        
         if (this._pushTimeout) clearTimeout(this._pushTimeout);
         this._pushTimeout = setTimeout(async () => {
             try {
                 this.setSyncIndicator('syncing');
+                // Deep Sync before push to avoid overwriting others
+                const { data: cloudData } = await this.sb.from('config').select('data').eq('id', 1).single();
+                if (cloudData && cloudData.data) {
+                    this.mergeData(cloudData.data, false, true); // Partial merge without render to get latest IDs
+                }
+
                 const { error } = await this.sb
                     .from('config')
                     .upsert({ id: 1, data: this.state });
                 
                 if (error) {
-                    console.error("Supabase Upsert Error:", error);
+                    console.error("Supabase Error:", error);
                     this.setSyncIndicator('error');
                 } else {
                     this.setSyncIndicator('success');
                 }
             } catch (e) {
-                console.error("Push failed:", e);
+                console.error("Push Error:", e);
                 this.setSyncIndicator('error');
             }
-        }, 500); // Wait 500ms for consecutive changes
+        }, 800); 
     }
 
     setSyncIndicator(status) {
@@ -147,33 +155,48 @@ class App {
         });
     }
 
-    mergeData(cloudData, isInitial = false) {
+    mergeData(cloudData, isInitial = false, isQuiet = false) {
         if (!cloudData) return;
 
-        // Logic: Keep validated tasks over pending ones
-        const mergedTasks = [...this.state.tasks];
+        const cloudGen = cloudData.generationId || 0;
+        const localGen = this.state.generationId || 0;
+
+        // If cloud generation is DIFFERENT, we must merge carefully
+        // If it's much newer (e.g. from a reset), we might consider overwriting
         
+        const mergedTasks = [...this.state.tasks];
+        let changed = false;
+
         cloudData.tasks.forEach(cloudTask => {
             const localIdx = mergedTasks.findIndex(t => t.id === cloudTask.id);
             if (localIdx === -1) {
                 mergedTasks.push(cloudTask);
+                changed = true;
             } else {
                 const localTask = mergedTasks[localIdx];
                 // Priority: validated > done > pending
-                if (cloudTask.status === 'validated' || 
-                   (cloudTask.status === 'done' && localTask.status === 'pending')) {
-                    mergedTasks[localIdx] = cloudTask;
+                // ALSO: if cloud task was changed, update it
+                if (cloudTask.status !== localTask.status) {
+                    const statusOrder = { 'pending': 0, 'done': 1, 'validated': 2 };
+                    if (statusOrder[cloudTask.status] > statusOrder[localTask.status]) {
+                        mergedTasks[localIdx] = cloudTask;
+                        changed = true;
+                    }
                 }
             }
         });
 
-        this.state.tasks = mergedTasks;
-        this.state.currentDay = Math.max(this.state.currentDay, cloudData.currentDay || 1);
-        this.state.earnings = cloudData.earnings || this.state.earnings;
+        if (changed || cloudGen > localGen) {
+            this.state.tasks = mergedTasks;
+            this.state.currentDay = Math.max(this.state.currentDay, cloudData.currentDay || 1);
+            this.state.earnings = cloudData.earnings || this.state.earnings;
+            this.state.generationId = Math.max(localGen, cloudGen);
+            
+            this.saveData(false);
+            if (!isQuiet) this.renderDashboard();
+        }
         
-        this.saveData(false); // Save locally without pushing back
-        this.renderDashboard();
-        this.showSyncStatus("Sincronizado");
+        if (!isQuiet) this.showSyncStatus("Sincronizado");
     }
 
     showSyncStatus(msg) {
