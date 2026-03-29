@@ -14,11 +14,11 @@
     --danger: #FF5252;
     
     /* Shadows & Effects */
-    --shadow-soft: 0 12px 40px rgba(0, 0, 0, 0.05);
-    --glass-blur: blur(12px);
-    --radius-lg: 32px;
-    --radius-md: 20px;
-    --transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+    --shadow-soft: 0 8px 32px rgba(0, 0, 0, 0.08);
+    --glass-blur: blur(16px);
+    --radius-lg: 28px;
+    --radius-md: 18px;
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .sync-dot {
@@ -30,9 +30,9 @@
     vertical-align: middle;
     transition: var(--transition);
 }
-.sync-dot.success { background: var(--success); box-shadow: 0 0 8px var(--success); }
-.sync-dot.syncing { background: var(--pending); animation: pulse 1s infinite; }
-.sync-dot.error { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+.sync-dot.success { background: var(--success); box-shadow: 0 0 12px var(--success); }
+.sync-dot.syncing { background: var(--pending); animation: pulse 1s infinite; box-shadow: 0 0 12px var(--pending); }
+.sync-dot.error { background: var(--danger); box-shadow: 0 0 12px var(--danger); }
 
 @keyframes pulse {
     0% { opacity: 0.4; }
@@ -88,15 +88,16 @@ body {
 }
 
 .modal-content {
-    background: var(--bg);
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: var(--glass-blur);
     padding: 30px;
-    border-radius: 24px;
+    border-radius: var(--radius-lg);
     width: 100%;
     max-width: 400px;
     text-align: center;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    animation: modal-enter 0.3s ease-out;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.15);
+    border: 1px solid var(--glass-border);
+    animation: modal-enter 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 @keyframes modal-enter {
@@ -325,12 +326,30 @@ header p {
     backdrop-filter: var(--glass-blur);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-md);
-    padding: 16px;
+    padding: 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: var(--shadow-soft);
+    gap: 16px;
+    margin-bottom: 12px;
     transition: var(--transition);
+    box-shadow: var(--shadow-soft);
+    position: relative;
+    overflow: hidden;
+}
+
+.task-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+}
+
+.task-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 4px; height: 100%;
+    background: var(--primary-light);
+    opacity: 0.5;
 }
 
 .task-main {
@@ -362,20 +381,18 @@ header p {
 }
 
 .btn-done {
-    background: white;
-    border: 2px solid var(--primary);
-    color: var(--primary);
-    padding: 10px 16px;
+    background: var(--primary);
+    color: white;
+    padding: 10px 20px;
+    border: none;
     border-radius: 12px;
     font-weight: 600;
     cursor: pointer;
     transition: var(--transition);
+    box-shadow: 0 4px 12px rgba(84, 110, 122, 0.3);
 }
 
-.btn-done:hover, .btn-done.active {
-    background: var(--primary);
-    color: white;
-}
+.btn-done:active { transform: scale(0.95); }
 
 .task-card.status-done {
     opacity: 0.8;
@@ -435,6 +452,15 @@ header p {
     border-radius: 20px;
     font-size: 0.85rem;
     font-weight: 600;
+}
+
+.badge-validated {
+    background: var(--success);
+    color: white;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
 }
 
 .validation-form label {
