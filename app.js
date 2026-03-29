@@ -257,6 +257,30 @@ class App {
         this.renderDashboard();
     }
 
+    async validateTask(taskId, quality, attitude, penalty = 0) {
+        const idx = this.state.tasks.findIndex(t => t.id === taskId);
+        if (idx === -1) return;
+
+        const task = this.state.tasks[idx];
+        const multiplier = (quality + attitude) / 2;
+        const totalReward = Math.max(0, (task.baseReward * multiplier) - penalty);
+
+        this.state.tasks[idx].status = 'validated';
+        this.state.tasks[idx].validation = { quality, attitude, penalty, totalReward };
+        
+        // Update earnings
+        if (task.assigneeId) {
+            this.state.earnings[task.assigneeId] = (this.state.earnings[task.assigneeId] || 0) + totalReward;
+        }
+
+        this.saveData(false);
+        this.renderDashboard();
+        
+        // Atomic Cloud Pushes
+        await this.pushTaskUpdate(taskId);
+        await this.pushGlobalConfig();
+    }
+
     showSyncStatus(msg) {
         const indicator = document.getElementById('sync-indicator');
         if (indicator) {
@@ -394,7 +418,7 @@ class App {
             footer.style.paddingBottom = '20px';
             document.getElementById('dashboard').appendChild(footer);
         }
-        footer.innerText = 'v6.0.0 · Supabase Real-time';
+        footer.innerText = 'v6.2.0 · Supabase Real-time (Granular)';
     }
 
     renderExtraTaskButton() {
@@ -536,20 +560,23 @@ class App {
         if (task.status === 'done') {
             return `<span class="task-badge badge-done">⌛ Revisando...</span>`;
         }
-        return `<button class="btn-done" onclick="window.app.markAsDone('${task.id}')">Hecho</button>`;
+        return `<button class="btn-done" onclick="window.app.markTaskDone('${task.id}')">Hecho</button>`;
     }
 
-    async markAsDone(taskId) {
-        const task = this.state.tasks.find(t => t.id === taskId);
-        if (task) {
-            task.status = 'done';
-            if (!task.assigneeId) {
-                task.assigneeId = this.state.currentUser.id;
-            }
-            this.saveData(); // This pushes to cloud
-            this.renderDashboard();
-            await this.showAlert("¡Hecho!", "✓ Tarea marcada. Espera a que Papá la valide.");
+    async markTaskDone(taskId) {
+        const idx = this.state.tasks.findIndex(t => t.id === taskId);
+        if (idx === -1) return;
+
+        this.state.tasks[idx].status = 'done';
+        if (!this.state.tasks[idx].assigneeId) {
+            this.state.tasks[idx].assigneeId = this.state.currentUser.id;
         }
+        this.saveData(false); // Save locally 
+        this.renderDashboard();
+        
+        // Granular Cloud Push
+        await this.pushTaskUpdate(taskId);
+        await this.showAlert("¡Hecho!", "✓ Tarea marcada. Espera a que Papá la valide.");
     }
 
     renderAdminPanel() {
@@ -667,26 +694,23 @@ class App {
     // Removed obsolete saveCloudUrl method as we now use Supabase constants
 
 
-    addExtraTask() {
-        const name = prompt("Nombre de la tarea Extra/Sorpresa:");
-        if (!name) return;
-        const type = confirm("¿Es una tarea SORPRESA? (Aceptar para Sorpresa, Cancelar para Extra)") ? 'surprise' : 'extra';
-        const reward = type === 'surprise' ? 2.5 : 1.5;
-        
+    async addExtraTask(assigneeId, name, reward) {
         const newTask = {
-            id: `extra-${Date.now()}`,
+            id: `extra-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
             name: name,
             day: this.state.currentDay,
-            type: type,
-            assigneeId: null,
-            baseReward: reward,
+            type: 'extra',
+            assigneeId: assigneeId,
+            baseReward: parseFloat(reward),
             status: 'pending',
             validation: null
         };
-        
+
         this.state.tasks.push(newTask);
-        this.saveData();
+        this.saveData(false);
         this.renderDashboard();
+        
+        await this.pushTaskUpdate(newTask.id);
     }
 
     async resetTasks() {
