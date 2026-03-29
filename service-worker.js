@@ -1,4 +1,4 @@
-const CACHE_NAME = 'mision-kora-v7'; // v6
+const CACHE_NAME = 'mision-kora-v8'; // v6
 const ASSETS = [
   './',
   './index.html',

@@ -85,7 +85,6 @@ class App {
         this.sb.channel('realtime:config')
             .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'config' }, payload => {
                 if (payload.new && payload.new.data) {
-                    console.log("Real-time Update Received!");
                     this.mergeData(payload.new.data, true);
                 }
             })
@@ -93,31 +92,27 @@ class App {
     }
 
     async syncWithSupabase(isInitial = false) {
-        if (!isInitial) this.showSyncStatus("Sincronizando manual...");
+        if (!isInitial) this.showSyncStatus("Sincronizando...");
         try {
             const { data, error } = await this.sb
                 .from('config')
                 .select('data')
                 .eq('id', 1)
                 .single();
-
-            if (error) {
-                if (error.code === 'PGRST116') {
-                    await this.pushToSupabase();
-                } else {
-                    console.error("Supabase Error:", error);
-                    if (!isInitial) this.showAlert("Error Sync", "No hemos podido conectar con la nube.");
-                }
-                return;
-            }
+            
+            if (error && error.code !== 'PGRST116') throw error;
 
             if (data && data.data) {
+                // Cloud data found: merge with local
                 this.mergeData(data.data, isInitial);
-                if (!isInitial) this.showSyncStatus("Sync OK");
+            } else if (isInitial) {
+                // First time ever: push current local state to create the row
+                await this.pushToSupabase();
             }
+            if (!isInitial) this.showSyncStatus("Sincronizado");
         } catch (e) {
-            console.error("Sync failed:", e);
-            if (!isInitial) this.showAlert("Error Red", "Revisa tu conexión a internet.");
+            console.error("Sync Error:", e);
+            if (!isInitial) this.setSyncIndicator('error');
         }
     }
 
@@ -152,50 +147,22 @@ class App {
         });
     }
 
-    mergeData(cloudData, isQuiet = false) {
-        const cloudGen = cloudData.generationId || 0;
-        const localGen = this.state.generationId || 0;
+    mergeData(cloudData, isInitial = false) {
+        if (!cloudData) return;
 
-        // If cloud is from a NEW Mission reset, overwrite local completely
-        if (cloudGen > localGen) {
-            this.state = { ...this.state, ...cloudData };
-            this.saveData(false);
-            if (this.state.currentUser) this.renderDashboard();
-            return;
-        }
-
-        // Merge logic for statuses
-        const statusOrder = { 'pending': 0, 'done': 1, 'validated': 2 };
-        let hasChanges = false;
+        // Logic: Keep validated tasks over pending ones
         const mergedTasks = [...this.state.tasks];
         
         cloudData.tasks.forEach(cloudTask => {
             const localIdx = mergedTasks.findIndex(t => t.id === cloudTask.id);
             if (localIdx === -1) {
                 mergedTasks.push(cloudTask);
-                hasChanges = true;
             } else {
                 const localTask = mergedTasks[localIdx];
-                const localOrder = statusOrder[localTask.status] || 0;
-                const cloudOrder = statusOrder[cloudTask.status] || 0;
-                
-                if (cloudOrder > localOrder) {
+                // Priority: validated > done > pending
+                if (cloudTask.status === 'validated' || 
+                   (cloudTask.status === 'done' && localTask.status === 'pending')) {
                     mergedTasks[localIdx] = cloudTask;
-                    hasChanges = true;
-                }
-            }
-        });
-
-        if (hasChanges) {
-            console.log("Applying cloud changes...");
-            this.state.tasks = mergedTasks;
-            this.state.currentDay = Math.max(this.state.currentDay, cloudData.currentDay || 1);
-            this.saveData(false);
-            if (this.state.currentUser) {
-                this.renderDashboard();
-                this.showSyncStatus("Actualizado");
-            }
-        } else {
             this.showSyncStatus("Sincronizado");
         }
     }
