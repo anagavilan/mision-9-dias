@@ -105,12 +105,13 @@ class App {
 
     async pushToSupabase() {
         try {
+            console.log("Pushing state to cloud...", this.state);
             const { error } = await this.sb
                 .from('config')
                 .upsert({ id: 1, data: this.state });
             
             if (error) console.error("Supabase Upsert Error:", error);
-            else console.log("Cloud Push Success");
+            else console.log("Cloud Push Success ✅");
         } catch (e) {
             console.error("Push failed:", e);
         }
@@ -525,17 +526,17 @@ class App {
     }
 
     async resetTasks() {
-        if (confirm("¿Seguro que quieres borrar todo y empezar de cero con la nueva lista de tareas?")) {
-            this.state.generationId = Date.now();
-            this.state.tasks = [];
-            this.generateAllDaysTasks();
-            this.state.currentDay = 1;
-            this.saveData(); // Calls sync push
-            this.renderDashboard();
-            this.showFeedback("✓ Aplicación reiniciada. Se está sincronizando con la nube.");
-            // Wait a bit and sync again to be sure
-            setTimeout(() => this.syncWithCloud(), 2000);
-        }
+        const confirm = await this.showConfirm("⚠ Reiniciar Todo", "¿Seguro que quieres borrar todo y empezar de cero?");
+        if (!confirm) return;
+
+        this.state.generationId = Date.now(); // NEW generation forces overwrite on children
+        this.state.tasks = [];
+        this.generateAllDaysTasks();
+        this.state.currentDay = 1;
+        
+        await this.pushToSupabase();
+        this.renderDashboard();
+        await this.showAlert("Reiniciado", "✓ Aplicación reseteada en la nube.");
     }
 
     registerServiceWorker() {
