@@ -290,33 +290,77 @@ header p {
 .badge-done { background: #E8F5E9; color: var(--success); }
 .badge-validated { background: var(--primary); color: white; }
 
-/* Modal */
-.modal-backdrop {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.4);
-    backdrop-filter: blur(4px);
+/* Modal improvements */
+.task-info-brief {
+    background: #f8f8f8;
+    padding: 12px;
+    border-radius: 12px;
+    margin-bottom: 20px;
     display: flex;
-    align-items: flex-end;
-    z-index: 1000;
+    justify-content: space-between;
+    align-items: center;
 }
 
-.modal-content {
-    background: white;
-    width: 100%;
-    max-width: 500px;
-    margin: 0 auto;
-    border-radius: 32px 32px 0 0;
-    padding: 32px;
-    animation: slideUp 0.3s ease;
+.user-badge {
+    background: var(--primary);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
 }
 
-@keyframes slideUp {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
+.validation-form label {
+    display: block;
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-top: 16px;
+    margin-bottom: 8px;
+    color: var(--text-muted);
+}
+
+.star-rating, .emoji-rating {
+    display: flex;
+    gap: 12px;
+}
+
+.star-rating span, .emoji-rating span {
+    font-size: 1.5rem;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    transition: var(--transition);
+}
+
+.star-rating span.active, .emoji-rating span.active {
+    background: #f0f0f0;
+    border-color: var(--primary);
+}
+
+.btn-confirm {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 14px 24px;
+    border-radius: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.modal-actions {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 12px;
+    margin-top: 32px;
+}
+
+.btn-cancel {
+    background: #eee;
+    border: none;
+    padding: 14px;
+    border-radius: 12px;
+    cursor: pointer;
 }
 
 /* Admin Only */

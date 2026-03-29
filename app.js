@@ -5,7 +5,7 @@ const USERS = [
     { id: 'julia', name: 'Julia', icon: '🌸', role: 'user' },
     { id: 'alex', name: 'Alex', icon: '🎧', role: 'user' },
     { id: 'sam', name: 'Sam', icon: '🦕', role: 'user' },
-    { id: 'admin', name: 'Mamá', icon: '👑', role: 'admin' }
+    { id: 'admin', name: 'Padres', icon: '👑', role: 'admin' }
 ];
 
 const INITIAL_TASKS = [
@@ -14,12 +14,16 @@ const INITIAL_TASKS = [
     { name: 'Poner/Quitar Mesa Noche', type: 'fixed', assigneeId: 'alex', baseReward: 0.5 },
     { name: 'Bajar Basura', type: 'fixed', assigneeId: 'sam', baseReward: 0.5 },
     
-    // Free tasks
-    { name: 'Sacar a Kora', type: 'free', baseReward: 1.0 },
+    // Free tasks (Unique)
     { name: 'Alimentar Kora (Mañana)', type: 'free', baseReward: 0.5 },
     { name: 'Alimentar Kora (Noche)', type: 'free', baseReward: 0.5 },
     { name: 'Vaciar Lavavajillas', type: 'free', baseReward: 0.8 },
-    { name: 'Limpiar Patio', type: 'free', baseReward: 1.2 }
+    { name: 'Limpiar Patio', type: 'free', baseReward: 1.2 },
+    
+    // Free tasks (Multiple slots for Sacar Kora)
+    { name: 'Sacar Kora (Mañana)', type: 'free', baseReward: 1.0 },
+    { name: 'Sacar Kora (Tarde)', type: 'free', baseReward: 1.0 },
+    { name: 'Sacar Kora (Noche)', type: 'free', baseReward: 1.0 }
 ];
 
 class App {
@@ -285,6 +289,7 @@ class App {
                 </div>
                 <div class="quick-actions">
                     <button class="btn-save" style="background:#8E735B" onclick="window.app.addExtraTask()">+ Añadir Extra/Sorpresa</button>
+                    <button class="btn-save" style="background:#D32F2F" onclick="window.app.resetTasks()">⚠ Reiniciar Todas las Tareas</button>
                 </div>
             </div>
             <h3>Validaciones Pendientes</h3>
@@ -343,6 +348,16 @@ class App {
         this.renderDashboard();
     }
 
+    resetTasks() {
+        if (confirm("¿Seguro que quieres borrar todo y empezar de cero con la nueva lista de tareas?")) {
+            this.state.tasks = [];
+            this.generateAllDaysTasks();
+            this.state.currentDay = 1;
+            this.saveData();
+            this.renderDashboard();
+        }
+    }
+
     registerServiceWorker() {
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('./service-worker.js')
@@ -357,26 +372,31 @@ class App {
         const content = document.getElementById('task-detail-modal');
         
         content.innerHTML = `
-            <h2>Validar: ${task.name}</h2>
-            <p>Realizada por ${USERS.find(u => u.id === task.assigneeId).name}</p>
+            <h2>Validar Tarea</h2>
+            <div class="task-info-brief">
+                <span class="task-name">${task.name}</span>
+                <span class="user-badge">${USERS.find(u => u.id === task.assigneeId).name} ${USERS.find(u => u.id === task.assigneeId).icon}</span>
+            </div>
             
             <div class="validation-form">
-                <label>Calidad (Resultado final)</label>
+                <label>Calidad del Resultado (1-3 Estrellas)</label>
                 <div class="star-rating" id="rating-quality">
                     <span data-val="1">⭐</span><span data-val="2">⭐⭐</span><span data-val="3">⭐⭐⭐</span>
                 </div>
 
-                <label>Actitud (¿Hubo quejas?)</label>
+                <label>Actitud / Sin Rechistar</label>
                 <div class="emoji-rating" id="rating-attitude">
-                    <span data-val="1">😠</span><span data-val="2">😐</span><span data-val="3">😊</span>
+                    <span data-val="1" title="Mal (con quejas)">😠</span>
+                    <span data-val="2" title="Neutral">😐</span>
+                    <span data-val="3" title="¡Muy bien! (Sin rechistar)">😊</span>
                 </div>
 
-                <label>Penalización (€)</label>
+                <label>Penalización (€) - *Solo si aplica*</label>
                 <input type="number" id="input-penalty" value="0" step="0.1" min="0">
 
                 <div class="modal-actions">
                     <button class="btn-cancel" onclick="window.app.closeModal()">Cerrar</button>
-                    <button class="btn-confirm" onclick="window.app.validateTask('${task.id}')">Confirmar y Pagar</button>
+                    <button class="btn-confirm" onclick="window.app.validateTask('${task.id}')">Validar y Pagar</button>
                 </div>
             </div>
         `;
