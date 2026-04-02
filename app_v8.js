@@ -174,6 +174,7 @@ class App {
                     baseReward: t.base_reward,
                     validation: t.validation
                 }));
+                this.healTaskRewards();
             } else if (isInitial && this.state.tasks.length > 0) {
                 // If cloud is empty but local has tasks, migrate them to the new table
                 console.log("Migrating local tasks to granular table...");
@@ -386,6 +387,28 @@ class App {
         }
         this.state.tasks = allTasks;
         this.saveData(); // This pushes them with deterministic IDs
+    }
+
+    healTaskRewards() {
+        let healedCount = 0;
+        this.state.tasks.forEach(task => {
+            const template = INITIAL_TASKS.find(it => it.name === task.name);
+            if (template && (task.baseReward === 0 || task.baseReward === null || typeof task.baseReward === 'undefined')) {
+                task.baseReward = template.baseReward;
+                healedCount++;
+            }
+        });
+        if (healedCount > 0) {
+            this.logDebug(`Healed ${healedCount} task rewards.`);
+            this.saveData(false); // Save locally
+        }
+    }
+
+    async forceHealAndSync() {
+        this.healTaskRewards();
+        await this.pushAllTasksToCloud();
+        await this.showAlert("Curación Completa", "Se han restaurado los importes base y se ha sincronizado con la nube.");
+        this.renderDashboard();
     }
 
     renderUserSelection() {
@@ -718,6 +741,7 @@ class App {
                                 <button class="btn-save" style="background:#455A64; flex:1; font-size:0.8rem" onclick="window.app.importData()">📥 Importar</button>
                             </div>
                             <button class="btn-save" style="background:#607D8B; font-size:0.8rem" onclick="window.app.clearLocalAndSync()">🔄 Forzar Recuperación Nube</button>
+                            <button class="btn-save" style="background:#26A69A; font-size:0.8rem" onclick="window.app.forceHealAndSync()">🚑 Reparar Importes a 0€</button>
                         </div>
                     </details>
                 </div>
