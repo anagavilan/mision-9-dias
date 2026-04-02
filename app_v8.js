@@ -74,17 +74,6 @@ class App {
 
             this.registerServiceWorker();
             this.loadData();
-            
-            // 2. ID ALIGNMENT (FORCE)
-            const needsMigration = this.state.tasks.length > 0 && 
-                                 (!this.state.tasks[0].id.startsWith('d1-i0-'));
-            
-            if (needsMigration) {
-                console.log("Alineando IDs de tareas...");
-                this.state.tasks = [];
-                this.generateAllDaysTasks();
-                this.saveData(true);
-            }
 
             if (this.state.tasks.length === 0) {
                 this.generateAllDaysTasks();
@@ -158,7 +147,7 @@ class App {
 
             // 2. Fetch All Tasks from the NEW granular table
             const { data: cloudTasks, error: tasksError } = await this.sb
-                .from('tasks').select('*');
+                .from('tasks').select('*').order('id', { ascending: true });
             
             if (tasksError) throw tasksError;
 
@@ -568,23 +557,13 @@ class App {
     }
 
     calculateEarnings(userId) {
-        let total = this.state.tasks
-            .filter(t => t.assigneeId === userId && t.status === 'validated')
-            .reduce((acc, t) => {
-                let reward = t.baseReward;
-                if (t.validation) {
-                    const qBonus = t.validation.quality === 3 ? 0.25 : 0.0;
-                    let aBonus = 0;
-                    if (t.validation.attitude === 3) aBonus = 0.25;
-                    else if (t.validation.attitude === 1) aBonus = -0.50;
-                    
-                    reward = t.baseReward + qBonus + aBonus - (t.validation.penalty || 0);
-                }
-                return acc + Math.max(0, reward);
-            }, 0);
+        // En lugar de recalcular desde el array (que puede haber sufrido reseteos),
+        // usamos el valor real acumulado históricamente en config.
+        let total = this.state.earnings[userId] || 0;
 
+        // Lógica de Constancia (Bonus de 5€) si han completado sus 9 días fijos
         const fixedTasks = this.state.tasks.filter(t => t.assigneeId === userId && t.type === 'fixed');
-        const allValidated = fixedTasks.length > 0 && fixedTasks.every(t => t.status === 'validated');
+        const allValidated = fixedTasks.length === 9 && fixedTasks.every(t => t.status === 'validated');
         
         if (allValidated) {
             total += 5.0;
