@@ -733,7 +733,7 @@ class App {
                 const user = USERS.find(u => u.id === t.assigneeId);
                 const isPending = t.status === 'pending';
                 return `
-                    <div class="task-card ${isPending ? 'task-disabled' : ''}" style="opacity: ${isPending ? 0.7 : 1}">
+                    <div class="task-card" style="opacity: ${isPending ? 0.7 : 1}">
                         <div class="task-main">
                             <span class="task-name">${t.name}</span>
                             <span class="user-badge">${user ? user.name : 'Libre (Asigna al Validar)' } ${user ? user.icon : '❓'}</span>
