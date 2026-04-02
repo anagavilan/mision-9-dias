@@ -90,6 +90,7 @@ class App {
                 const userObj = USERS.find(u => u.email === session.user.email);
                 if (userObj) {
                     this.state.currentUser = userObj;
+                    this.state.adminViewDay = this.getAutomaticCurrentDay();
                     document.getElementById('dashboard').classList.remove('hidden');
                     
                     // Iniciar Sync solo cuando estamos autenticados
@@ -540,21 +541,23 @@ class App {
         }
     }
 
-    nextDay() {
-        if (this.state.currentDay < 9) {
-            this.state.currentDay++;
-            this.saveData();
+    adminNextDay() {
+        if (this.state.adminViewDay < 9) {
+            this.state.adminViewDay++;
             this.renderDashboard();
         }
     }
 
-    prevDay() {
-        if (this.state.currentDay > 1) {
-            this.state.currentDay--;
-            this.saveData();
+    adminPrevDay() {
+        if (this.state.adminViewDay > 1) {
+            this.state.adminViewDay--;
             this.renderDashboard();
         }
     }
+
+    // Ya no las usan los hijos
+    nextDay() { }
+    prevDay() { }
 
     updateStats() {
         const user = this.state.currentUser;
@@ -672,11 +675,16 @@ class App {
         if (!adminPanel) return;
 
         const scrollPos = window.scrollY; // SAVE SCROLL
-        const pending = this.state.tasks.filter(t => t.status === 'done');
+        const unvalidatedTasks = this.state.tasks.filter(t => t.day === this.state.adminViewDay && t.status !== 'validated');
 
         // Only update the controls part IF not already there to avoid flickering
         let controlsHtml = `
             <div class="admin-controls">
+                <div class="day-selector">
+                    <button onclick="window.app.adminPrevDay()">◀</button>
+                    <span>Viendo Día ${this.state.adminViewDay}</span>
+                    <button onclick="window.app.adminNextDay()">▶</button>
+                </div>
                 <div class="quick-actions">
                     <div id="sync-indicator" style="font-size:0.7rem; text-align:center; color:var(--text-muted); margin-bottom:10px; transition: opacity 0.5s">Sincronizado</div>
                     <button class="btn-save" style="background:#4CAF50" onclick="window.app.syncWithSupabase()">🔄 Sincronizar Ahora</button>
@@ -706,26 +714,30 @@ class App {
         `;
 
         let listHtml = '';
-        if (pending.length === 0) {
-            listHtml = '<p class="text-muted">No hay tareas pendientes de validar.</p>';
+        if (unvalidatedTasks.length === 0) {
+            listHtml = '<p class="text-muted">No hay tareas pendientes para este día.</p>';
         } else {
-            listHtml = pending.map(t => {
+            listHtml = unvalidatedTasks.map(t => {
                 const user = USERS.find(u => u.id === t.assigneeId);
+                const isPending = t.status === 'pending';
                 return `
-                    <div class="task-card">
+                    <div class="task-card ${isPending ? 'task-disabled' : ''}" style="opacity: ${isPending ? 0.7 : 1}">
                         <div class="task-main">
                             <span class="task-name">${t.name}</span>
-                            <span class="user-badge">${user ? user.name : '?' } (${user ? user.icon : '❓'})</span>
+                            <span class="user-badge">${user ? user.name : 'Libre (Asigna al Validar)' } ${user ? user.icon : '❓'}</span>
                         </div>
-                        <button class="btn-done active" onclick="window.app.openValidationModal('${t.id}')">Validar</button>
+                        <div class="task-action">
+                            ${isPending ? '<span class="limit-msg" style="margin-right:10px">No Marcada</span>' : ''}
+                            <button class="btn-done active" onclick="window.app.openValidationModal('${t.id}')">Validar</button>
+                        </div>
                     </div>
                 `;
             }).join('');
         }
 
-        const validated = this.state.tasks.filter(t => t.day === this.state.currentDay && t.status === 'validated');
+        const validated = this.state.tasks.filter(t => t.day === this.state.adminViewDay && t.status === 'validated');
         let historyHtml = `
-            <h3 style="margin-top:30px">✅ Registro de Hoy (Día ${this.state.currentDay})</h3>
+            <h3 style="margin-top:30px">✅ Registro del Día ${this.state.adminViewDay}</h3>
             <div class="tasks-grid">
                 ${validated.length === 0 ? '<p class="text-muted">No hay tareas validadas hoy.</p>' : 
                     validated.map(t => {
@@ -843,15 +855,26 @@ class App {
         const task = this.state.tasks.find(t => t.id === taskId);
         const modal = document.getElementById('modal-container');
         const content = document.getElementById('task-detail-modal');
+
+        let assigneeSelectHtml = '';
+        if (!task.assigneeId) {
+            assigneeSelectHtml = `
+                <label style="color:#d32f2f; font-weight:bold">¿Quién realizó esta tarea libre?</label>
+                <select id="modal-assignee-select" class="modal-input" style="width:100%; margin-bottom:15px; padding:10px; border-radius:5px">
+                    ${USERS.filter(u => u.role !== 'admin').map(u => `<option value="${u.id}">${u.name}</option>`).join('')}
+                </select>
+            `;
+        }
         
         content.innerHTML = `
             <h2>Validar Tarea</h2>
             <div class="task-info-brief">
                 <span class="task-name">${task.name}</span>
-                <span class="user-badge">${USERS.find(u => u.id === task.assigneeId).name} ${USERS.find(u => u.id === task.assigneeId).icon}</span>
+                <span class="user-badge">${task.assigneeId ? USERS.find(u => u.id === task.assigneeId).name : 'Pendiente Asignar'}</span>
             </div>
             
             <div class="validation-form">
+                ${assigneeSelectHtml}
                 <label>Calidad del Resultado (1-3 Estrellas)</label>
                 <div class="star-rating" id="rating-quality">
                     <span data-val="1">⭐</span><span data-val="2">⭐⭐</span><span data-val="3">⭐⭐⭐</span>
@@ -895,7 +918,15 @@ class App {
     }
 
     async validateTask(taskId) {
-        const task = this.state.tasks.find(t => t.id === taskId);
+        const idx = this.state.tasks.findIndex(t => t.id === taskId);
+        if (idx === -1) return;
+
+        const selectElem = document.getElementById('modal-assignee-select');
+        if (selectElem && !this.state.tasks[idx].assigneeId) {
+            this.state.tasks[idx].assigneeId = selectElem.value;
+        }
+
+        const task = this.state.tasks[idx];
         const penalty = parseFloat(document.getElementById('input-penalty').value) || 0;
         
         task.status = 'validated';
@@ -905,13 +936,25 @@ class App {
             penalty: penalty
         };
 
-        // 1. SAVE LOCAL (Instant)
+        // 1. Calcular recompensa final e inyectarla en la bóveda de ganancias histórica
+        const qBonus = this.tempValidation.quality === 3 ? 0.25 : 0.0;
+        let aBonus = 0;
+        if (this.tempValidation.attitude === 3) aBonus = 0.25;
+        else if (this.tempValidation.attitude === 1) aBonus = -0.50;
+        
+        const totalReward = task.baseReward + qBonus + aBonus - penalty;
+        
+        if (task.assigneeId) {
+            this.state.earnings[task.assigneeId] = (this.state.earnings[task.assigneeId] || 0) + Math.max(0, totalReward);
+        }
+
+        // 2. SAVE LOCAL (Instant)
         this.saveData(false); 
         this.closeModal();
         this.renderDashboard();
         this.showFeedback('Tarea validada con éxito.');
 
-        // 2. SYNC CLOUD (Background/Granular)
+        // 3. SYNC CLOUD (Background/Granular)
         await this.pushTaskUpdate(taskId);
         await this.pushGlobalConfig();
     }
