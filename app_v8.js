@@ -730,6 +730,7 @@ class App {
                     <div id="sync-indicator" style="font-size:0.7rem; text-align:center; color:var(--text-muted); margin-bottom:10px; transition: opacity 0.5s">Sincronizado</div>
                     <button class="btn-save" style="background:#4CAF50" onclick="window.app.syncWithSupabase()">🔄 Sincronizar Ahora</button>
                     <button class="btn-save" style="background:#8E735B" onclick="window.app.createSurpriseTask()">+ Añadir Sorpresa 🎁</button>
+                    <button class="btn-save" style="background:#2196F3; font-weight:bold" onclick="window.app.manualAddFinishedTask()">📥 Añadir Retroactiva (Pago Directo)</button>
                     <button class="btn-save" style="background:#D32F2F; border: 3px solid white" onclick="window.app.nuclearReset()">☢️ ALINEAR TODA LA FAMILIA (Nuclear)</button>
                     
                     <details style="margin-top:15px; color:var(--text-muted); font-size:0.9rem">
@@ -1037,6 +1038,46 @@ class App {
         await this.pushTaskUpdate(taskId);
         await this.pushGlobalConfig();
     } catch (e) { window.app.showAlert("Error Validate", e.message + " " + e.stack); console.error(e); } 
+    }
+
+    async manualAddFinishedTask() {
+        const name = await this.showPrompt("Descripción", "¿Qué tarea quieres añadir de forma manual?", "Tarea Extra");
+        if (!name || name.trim() === '') return;
+
+        const options = USERS.filter(u => u.role !== 'admin').map((u, i) => `${i + 1}. ${u.name}`).join('\n');
+        const childIdxStr = await this.showPrompt("Elegir Niño", `¿Quién la hizo?\n${options}`, "1");
+        const childIdx = parseInt(childIdxStr) - 1;
+        const targetChild = USERS.filter(u => u.role !== 'admin')[childIdx];
+        if (!targetChild) return;
+
+        const dayStr = await this.showPrompt("Día de Misión", "¿Qué día fue? (1-9)", this.getAutomaticCurrentDay().toString());
+        const day = parseInt(dayStr) || this.getAutomaticCurrentDay();
+
+        const amountStr = await this.showPrompt("Importe Final", "¿Cuántos euros exactos le quieres pagar?", "1.00");
+        const amount = parseFloat(amountStr) || 0;
+
+        const newTask = {
+            id: `manual-${Date.now()}`,
+            name: '📥 ' + name.trim(),
+            day: day,
+            type: 'extra', // Lo tratamos como extra pero forzadamente validado
+            assigneeId: targetChild.id,
+            baseReward: amount,
+            status: 'validated',
+            validation: {
+                quality: 3,
+                attitude: 3,
+                penalty: 0
+            }
+        };
+
+        this.state.tasks.push(newTask);
+        this.saveData(false);
+        this.renderDashboard();
+        
+        await this.pushTaskUpdate(newTask.id);
+        await this.pushGlobalConfig();
+        await this.showAlert("Añadida", `¡Listo! Se ha añadido la tarea de "${name}" para ${targetChild.name} el Día ${day} con un importe de ${amount}€.`);
     }
 
     async createSurpriseTask() {
