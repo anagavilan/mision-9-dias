@@ -423,7 +423,7 @@ class App {
         if (loader) loader.classList.add('hidden');
 
         if (error) {
-            this.showAlert("Error de Acceso", "El PIN es incorrecto o hay un error de conexión.");
+            this.showAlert("Error de Acceso", `Supabase dice: ${error.message} (Revisa si el usuario de ese niño fue creado, si el email está confirmado, o si la contraseña es exactamente 'pin' + tu PIN)`);
             console.error("Login auth error:", error);
             return;
         }
