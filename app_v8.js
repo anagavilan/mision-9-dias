@@ -43,6 +43,25 @@ class App {
         
         this.init();
     }
+    
+    getAutomaticCurrentDay() {
+        const startDateStr = '2026-04-01'; // Día 1 oficial
+        // Formato YYYY-MM-DD en hora de España
+        const todayStr = new Intl.DateTimeFormat('fr-CA', {timeZone: 'Europe/Madrid'}).format(new Date());
+        
+        const start = Date.parse(startDateStr + "T00:00:00Z");
+        const today = Date.parse(todayStr + "T00:00:00Z");
+        
+        const diffDays = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+        let computedDay = diffDays + 1;
+        
+        // Mapear entre 1 y 9
+        if (computedDay < 1) computedDay = 1;
+        if (computedDay > 9) computedDay = 9;
+        
+        return computedDay;
+    }
+
     async init() {
         try {
             // 1. Force Clean Refresh 
@@ -144,9 +163,13 @@ class App {
             if (tasksError) throw tasksError;
 
             if (configData) {
-                this.state.currentDay = configData.current_day || 1;
+                // Ya no confiamos en configData.current_day para obligarlo. 
+                // Lo hacemos 100% automático por fecha.
+                this.state.currentDay = this.getAutomaticCurrentDay();
                 this.state.earnings = configData.earnings || this.state.earnings;
                 this.state.generationId = configData.generation_id || this.state.generationId;
+            } else {
+                this.state.currentDay = this.getAutomaticCurrentDay();
             }
 
             if (cloudTasks && cloudTasks.length > 0) {
@@ -442,7 +465,19 @@ class App {
     renderDashboard() {
         const user = this.state.currentUser;
         document.getElementById('current-user-name').innerText = user.name;
+        
+        // Refrescar el día dinámico en cada renderizado por si han pasado las 00:00
+        this.state.currentDay = this.getAutomaticCurrentDay();
         document.getElementById('day-counter').innerText = `Día ${this.state.currentDay}/9`;
+        
+        // Renderizar la fecha real en la cabecera de las tareas
+        const dateElem = document.getElementById('current-date');
+        if (dateElem) {
+            const options = { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'Europe/Madrid' };
+            let displayDate = new Intl.DateTimeFormat('es-ES', options).format(new Date());
+            displayDate = displayDate.charAt(0).toUpperCase() + displayDate.slice(1);
+            dateElem.innerText = displayDate;
+        }
         
         // Show/Hide sections based on role
         if (user.role === 'admin') {
@@ -651,11 +686,6 @@ class App {
         // Only update the controls part IF not already there to avoid flickering
         let controlsHtml = `
             <div class="admin-controls">
-                <div class="day-selector">
-                    <button onclick="window.app.prevDay()">◀</button>
-                    <span>Día ${this.state.currentDay}</span>
-                    <button onclick="window.app.nextDay()">▶</button>
-                </div>
                 <div class="quick-actions">
                     <div id="sync-indicator" style="font-size:0.7rem; text-align:center; color:var(--text-muted); margin-bottom:10px; transition: opacity 0.5s">Sincronizado</div>
                     <button class="btn-save" style="background:#4CAF50" onclick="window.app.syncWithSupabase()">🔄 Sincronizar Ahora</button>
