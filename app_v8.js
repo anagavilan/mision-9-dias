@@ -45,7 +45,7 @@ class App {
     }
     
     getAutomaticCurrentDay() {
-        const startDateStr = '2026-04-01'; // Día 1 oficial
+        const startDateStr = '2026-03-29'; // Día 1 oficial
         // Formato YYYY-MM-DD en hora de España
         const todayStr = new Intl.DateTimeFormat('fr-CA', {timeZone: 'Europe/Madrid'}).format(new Date());
         
