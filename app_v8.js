@@ -2,10 +2,10 @@
 // Core Application Logic
 
 const USERS = [
-    { id: 'julia', name: 'Julia', icon: '🌸', role: 'user', pin: '1234' }, // PIN Added
-    { id: 'alex', name: 'Alex', icon: '🎧', role: 'user' },
-    { id: 'sam', name: 'Sam', icon: '🦕', role: 'user' },
-    { id: 'admin', name: 'Papás', icon: '👑', role: 'admin' }
+    { id: 'julia', email: 'julia@mision9dias.app', name: 'Julia', icon: '🌸', role: 'user', pin: '1234' },
+    { id: 'alex', email: 'alex@mision9dias.app', name: 'Alex', icon: '🎧', role: 'user', pin: '1234' },
+    { id: 'sam', email: 'sam@mision9dias.app', name: 'Sam', icon: '🦕', role: 'user', pin: '1234' },
+    { id: 'admin', email: 'admin@mision9dias.app', name: 'Papás', icon: '👑', role: 'admin', pin: '2026' }
 ];
 
 const INITIAL_TASKS = [
@@ -71,16 +71,32 @@ class App {
                 this.generateAllDaysTasks();
             }
 
-            this.renderUserSelection();
             this.setupEventListeners();
             
             document.getElementById('loader')?.classList.add('hidden');
             document.body.classList.add('ready');
-            document.getElementById('user-selection')?.classList.remove('hidden');
 
-            // 3. Setup Connection
-            this.setupRealtimeSync();
-            await this.syncWithSupabase(true);
+            // Recuperar sesión activa de Supabase
+            const { data: { session } } = await this.sb.auth.getSession();
+            if (session && session.user) {
+                const userObj = USERS.find(u => u.email === session.user.email);
+                if (userObj) {
+                    this.state.currentUser = userObj;
+                    document.getElementById('dashboard').classList.remove('hidden');
+                    
+                    // Iniciar Sync solo cuando estamos autenticados
+                    this.setupRealtimeSync();
+                    await this.syncWithSupabase(true);
+                    this.renderDashboard();
+                } else {
+                    document.getElementById('user-selection')?.classList.remove('hidden');
+                    this.renderUserSelection();
+                }
+            } else {
+                document.getElementById('user-selection')?.classList.remove('hidden');
+                this.renderUserSelection();
+            }
+
         } catch (e) {
             console.error("Init Error:", e);
             document.getElementById('loader')?.classList.add('hidden');
@@ -95,7 +111,7 @@ class App {
             // Listen for Global Config changes
             .on('postgres_changes', { event: '*', schema: 'public', table: 'config' }, payload => {
                 if (payload.new) {
-                    this.state.current_day = payload.new.current_day || this.state.current_day;
+                    this.state.currentDay = payload.new.current_day || this.state.currentDay;
                     this.state.earnings = payload.new.earnings || this.state.earnings;
                     this.renderDashboard();
                 }
@@ -183,7 +199,7 @@ class App {
     async pushGlobalConfig() {
         try {
             const { error } = await this.sb.from('config').upsert({
-                id: 'global', 
+                id: 1, // Corrected from 'global' to 1 for consistency
                 current_day: this.state.currentDay, 
                 earnings: this.state.earnings,
                 generation_id: this.state.generationId
@@ -376,34 +392,51 @@ class App {
     async login(userId) {
         const user = USERS.find(u => u.id === userId);
         
-        // Security check for Parents
-        if (user.role === 'admin') {
-            const pin = await this.showPrompt("Seguridad", "Introduce el PIN de acceso para Papás:", "PIN de 4 cifras");
-            if (pin !== "2026") {
-                this.showAlert("Error", "PIN Incorrecto");
-                return;
-            }
-        }
+        let promptText = "Tu PIN:";
+        if (user.role === 'admin') promptText = "PIN de acceso para Papás:";
+        else promptText = `Introduce el PIN para el perfil de ${user.name}:`;
 
-        // Security check for specific users (like Julia)
-        if (user.pin) {
-            const pin = await this.showPrompt("Acceso", `Introduce el PIN para el perfil de ${user.name}:`, "Tu contraseña");
-            if (pin !== user.pin) {
-                this.showAlert("Error", "PIN Incorrecto");
-                return;
-            }
+        const pin = await this.showPrompt("Acceso Seguro", promptText, "PIN numérico");
+        if (!pin) return;
+
+        // Iniciar sesión con Supabase en background
+        const loader = document.getElementById('loader');
+        if (loader) loader.classList.remove('hidden');
+        
+        const { data, error } = await this.sb.auth.signInWithPassword({
+            email: user.email,
+            password: 'pin' + pin
+        });
+
+        if (loader) loader.classList.add('hidden');
+
+        if (error) {
+            this.showAlert("Error de Acceso", "El PIN es incorrecto o hay un error de conexión.");
+            console.error("Login auth error:", error);
+            return;
         }
 
         this.state.currentUser = user;
         document.getElementById('user-selection').classList.add('hidden');
         document.getElementById('dashboard').classList.remove('hidden');
+        
+        // Iniciar Sincronización post-login
+        this.setupRealtimeSync();
+        await this.syncWithSupabase(true);
         this.renderDashboard();
     }
 
-    logout() {
+    async logout() {
+        if (this.channel) {
+            this.sb.removeChannel(this.channel);
+            this.channel = null;
+        }
+        await this.sb.auth.signOut();
+        
         this.state.currentUser = null;
         document.getElementById('dashboard').classList.add('hidden');
         document.getElementById('user-selection').classList.remove('hidden');
+        this.renderUserSelection();
     }
 
     renderDashboard() {
