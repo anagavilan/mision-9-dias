@@ -415,15 +415,27 @@ class App {
         const loader = document.getElementById('loader');
         if (loader) loader.classList.remove('hidden');
         
-        const { data, error } = await this.sb.auth.signInWithPassword({
+        let { data, error } = await this.sb.auth.signInWithPassword({
             email: user.email,
             password: 'pin' + pin
         });
 
+        // Intentar la contraseña tal cual la escribieron por si la configuraron diferente en Supabase
+        if (error && error.message === 'Invalid login credentials') {
+            const tempResponse = await this.sb.auth.signInWithPassword({
+                email: user.email,
+                password: pin
+            });
+            if (!tempResponse.error) {
+                data = tempResponse.data;
+                error = null;
+            }
+        }
+
         if (loader) loader.classList.add('hidden');
 
         if (error) {
-            this.showAlert("Error de Acceso", `Supabase dice: ${error.message} (Revisa si el usuario de ese niño fue creado, si el email está confirmado, o si la contraseña es exactamente 'pin' + tu PIN)`);
+            this.showAlert("Error de Acceso", `Supabase dice: ${error.message} (Asegúrate de que su correo en Supabase es ${user.email} y que la contraseña y confirmaciones de email sean correctas)`);
             console.error("Login auth error:", error);
             return;
         }
