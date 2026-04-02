@@ -864,6 +864,7 @@ class App {
     }
 
     openValidationModal(taskId) {
+        try {
         const task = this.state.tasks.find(t => t.id === taskId);
         const modal = document.getElementById('modal-container');
         const content = document.getElementById('task-detail-modal');
@@ -927,9 +928,11 @@ class App {
         });
 
         modal.classList.remove('hidden');
+    } catch (e) { window.app.showAlert("Error Modal", e.message + " " + e.stack); console.error(e); } 
     }
-
+    
     async validateTask(taskId) {
+        try {
         const idx = this.state.tasks.findIndex(t => t.id === taskId);
         if (idx === -1) return;
 
@@ -969,8 +972,9 @@ class App {
         // 3. SYNC CLOUD (Background/Granular)
         await this.pushTaskUpdate(taskId);
         await this.pushGlobalConfig();
+    } catch (e) { window.app.showAlert("Error Validate", e.message + " " + e.stack); console.error(e); } 
     }
-
+    
     async requestExtraTask() {
         const options = [
             { name: 'Preparar Comida', reward: 1.5 },
