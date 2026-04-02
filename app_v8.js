@@ -577,14 +577,20 @@ class App {
             .filter(t => t.assigneeId === userId && t.status === 'validated')
             .reduce((acc, t) => {
                 let reward = t.baseReward;
-                if (t.validation) {
+                
+                // Las tareas sorpresa no tienen bonus ni penalizaciones de validación manual
+                if (t.validation && t.type !== 'sorpresa') {
                     const qBonus = t.validation.quality === 3 ? 0.25 : 0.0;
                     let aBonus = 0;
                     if (t.validation.attitude === 3) aBonus = 0.25;
                     else if (t.validation.attitude === 1) aBonus = -0.50;
                     
                     reward = t.baseReward + qBonus + aBonus - (t.validation.penalty || 0);
+                } else if (t.validation && t.type === 'sorpresa') {
+                    // Si es sorpresa, solo aplicamos la baseReward (y penalty si existiera, aunque lo quitamos de la UI)
+                    reward = t.baseReward - (t.validation.penalty || 0);
                 }
+                
                 return acc + Math.max(0, reward);
             }, 0);
 
@@ -700,7 +706,7 @@ class App {
                 <div class="quick-actions">
                     <div id="sync-indicator" style="font-size:0.7rem; text-align:center; color:var(--text-muted); margin-bottom:10px; transition: opacity 0.5s">Sincronizado</div>
                     <button class="btn-save" style="background:#4CAF50" onclick="window.app.syncWithSupabase()">🔄 Sincronizar Ahora</button>
-                    <button class="btn-save" style="background:#8E735B" onclick="window.app.renderRequestExtraModal()">+ Añadir Extra/Sorpresa</button>
+                    <button class="btn-save" style="background:#8E735B" onclick="window.app.createSurpriseTask()">+ Añadir Sorpresa 🎁</button>
                     <button class="btn-save" style="background:#D32F2F; border: 3px solid white" onclick="window.app.nuclearReset()">☢️ ALINEAR TODA LA FAMILIA (Nuclear)</button>
                     
                     <details style="margin-top:15px; color:var(--text-muted); font-size:0.9rem">
@@ -879,15 +885,26 @@ class App {
             `;
         }
         
-        content.innerHTML = `
-            <h2>Validar Tarea</h2>
-            <div class="task-info-brief">
-                <span class="task-name">${task.name}</span>
-                <span class="user-badge">${task.assigneeId ? USERS.find(u => u.id === task.assigneeId).name : 'Pendiente Asignar'}</span>
-            </div>
-            
-            <div class="validation-form">
-                ${assigneeSelectHtml}
+        let validationHtml = '';
+        if (task.type === 'sorpresa') {
+            validationHtml = `
+                <div style="background:#f0f7f0; padding:15px; border-radius:10px; margin-bottom:15px; text-align:center; border: 1px solid #c8e6c9">
+                    <div style="font-size:1.2rem; margin-bottom:5px">🎁 Recompensa Fija</div>
+                    <div style="font-size:1.5rem; font-weight:bold; color:#2e7d32">${task.baseReward.toFixed(2)}€</div>
+                    <p style="font-size:0.8rem; color:#666; margin-top:5px">Las tareas sorpresa no tienen bonus de calidad o actitud.</p>
+                </div>
+            `;
+        } else {
+            let extraIncentiveHtml = '';
+            if (task.type === 'extra') {
+                extraIncentiveHtml = `
+                    <label>¿Cuánto vale esta tarea? (€)</label>
+                    <input type="number" id="input-base-reward" value="${task.baseReward || 1.0}" step="0.1" min="0" style="margin-bottom:15px; width:100%; padding:10px; border-radius:5px; border:1px solid #ddd">
+                `;
+            }
+
+            validationHtml = `
+                ${extraIncentiveHtml}
                 <label>Calidad del Resultado (1-3 Estrellas)</label>
                 <div class="star-rating" id="rating-quality">
                     <span data-val="1">⭐</span><span data-val="2">⭐⭐</span><span data-val="3">⭐⭐⭐</span>
@@ -902,8 +919,21 @@ class App {
 
                 <label>Penalización (€) - *Solo si aplica*</label>
                 <input type="number" id="input-penalty" value="0" step="0.1" min="0">
+            `;
+        }
 
-                <div class="modal-actions">
+        content.innerHTML = `
+            <h2>Validar Tarea</h2>
+            <div class="task-info-brief">
+                <div class="task-name">${task.name}</div>
+                <div class="user-badge">${task.assigneeId ? USERS.find(u => u.id === task.assigneeId).name : 'Pendiente Asignar'}</div>
+            </div>
+            
+            <div class="validation-form">
+                ${assigneeSelectHtml}
+                ${validationHtml}
+                
+                <div class="modal-actions" style="margin-top:20px">
                     <button class="btn-cancel" style="background:#FF9800; color:white" onclick="window.app.rejectTask('${task.id}')">No hecha</button>
                     <button class="btn-confirm" style="background:var(--primary); color:white" onclick="window.app.validateTask('${task.id}')">Validar ✅</button>
                 </div>
@@ -940,22 +970,32 @@ class App {
         if (selectElem && !this.state.tasks[idx].assigneeId) {
             this.state.tasks[idx].assigneeId = selectElem.value;
         }
+        
+        // Asignar el nuevo baseReward si se cambió (para tareas extra)
+        const baseRw = document.getElementById('input-base-reward');
+        if (baseRw) {
+            this.state.tasks[idx].baseReward = parseFloat(baseRw.value) || 0;
+        }
 
         const task = this.state.tasks[idx];
-        const penalty = parseFloat(document.getElementById('input-penalty').value) || 0;
+        const penaltyElem = document.getElementById('input-penalty');
+        const penalty = penaltyElem ? (parseFloat(penaltyElem.value) || 0) : 0;
         
         task.status = 'validated';
         task.validation = {
-            quality: this.tempValidation.quality,
-            attitude: this.tempValidation.attitude,
+            quality: this.tempValidation ? this.tempValidation.quality : 2,
+            attitude: this.tempValidation ? this.tempValidation.attitude : 3,
             penalty: penalty
         };
 
-        // 1. Calcular recompensa final e inyectarla en la bóveda de ganancias histórica
-        const qBonus = this.tempValidation.quality === 3 ? 0.25 : 0.0;
+        // 1. Calcular recompensa final e inyectarla en la bóveda de ganancias histórica (Opcional, ahora sumamos dinámicamente)
+        let qBonus = 0;
         let aBonus = 0;
-        if (this.tempValidation.attitude === 3) aBonus = 0.25;
-        else if (this.tempValidation.attitude === 1) aBonus = -0.50;
+        if (task.type !== 'sorpresa') {
+            qBonus = task.validation.quality === 3 ? 0.25 : 0.0;
+            if (task.validation.attitude === 3) aBonus = 0.25;
+            else if (task.validation.attitude === 1) aBonus = -0.50;
+        }
         
         const totalReward = task.baseReward + qBonus + aBonus - penalty;
         
@@ -974,39 +1014,52 @@ class App {
         await this.pushGlobalConfig();
     } catch (e) { window.app.showAlert("Error Validate", e.message + " " + e.stack); console.error(e); } 
     }
+
+    async createSurpriseTask() {
+        const name = await this.showPrompt("Tarea Sorpresa", "Nombre o descripción de la Tarea Sorpresa:", "");
+        if (!name || name.trim() === '') return;
+        
+        const amountStr = await this.showPrompt("Importe Fijo", "¿Cuántos euros exactos vale esta tarea? (ej. 2.50)", "1.00");
+        const amount = parseFloat(amountStr);
+        if (isNaN(amount)) return;
+        
+        const newTask = {
+            id: `sorpresa-${Date.now()}`,
+            name: '🎁 ' + name.trim(),
+            day: this.state.adminViewDay,
+            type: 'sorpresa',
+            assigneeId: null, // Asignar al validar
+            baseReward: amount,
+            status: 'pending',
+            validation: null
+        };
+        this.state.tasks.push(newTask);
+        this.saveData(false);
+        this.renderDashboard();
+        await this.pushTaskUpdate(newTask.id);
+        await this.showAlert("Creada", "Tarea sorpresa creada para el Día " + this.state.adminViewDay);
+    }
     
     async requestExtraTask() {
-        const options = [
-            { name: 'Preparar Comida', reward: 1.5 },
-            { name: 'Preparar Cena', reward: 1.5 },
-            { name: 'Cepillar a Kora', reward: 1.0 },
-            { name: 'Limpiar Nevera', reward: 2.0 },
-            { name: 'Ordenar Trastero/Cajones', reward: 2.0 }
-        ];
-
-        const list = options.map((o, i) => `${i + 1}. ${o.name} (+${o.reward.toFixed(2)}€)`).join('\n');
-        const choice = await this.showPrompt("Elegir Tarea Extra", `Opciones:\n${list}\n\nEscribe el número:`, "1");
+        const text = await this.showPrompt("Proponer Tarea Extra", "¿Qué tarea extra quieres proponer (que no esté en la lista)?", "");
+        if (!text || text.trim() === '') return;
         
-        const idx = parseInt(choice) - 1;
-        if (options[idx]) {
-            const newTask = {
-                id: `extra-req-${Date.now()}`,
-                name: options[idx].name,
-                day: this.state.currentDay,
-                type: 'extra',
-                assigneeId: this.state.currentUser.id,
-                baseReward: options[idx].reward,
-                status: 'pending',
-                validation: null
-            };
-            this.state.tasks.push(newTask);
-            this.saveData(false);
-            this.renderDashboard();
-            
-            // GRANULAR PUSH (v8.6)
-            await this.pushTaskUpdate(newTask.id);
-            await this.showAlert("Añadida", `¡Tarea "${newTask.name}" añadida a tu lista!`);
-        }
+        const newTask = {
+            id: `extra-req-${Date.now()}`,
+            name: text.trim(),
+            day: this.state.currentDay,
+            type: 'extra',
+            assigneeId: this.state.currentUser.id,
+            baseReward: 0,
+            status: 'pending',
+            validation: null
+        };
+        this.state.tasks.push(newTask);
+        this.saveData(false);
+        this.renderDashboard();
+        
+        await this.pushTaskUpdate(newTask.id);
+        await this.showAlert("Propuesta", `¡Tarea "${newTask.name}" añadida! Papá/Mamá pondrán el premio al validarla.`);
     }
 
     async rejectTask(taskId) {
